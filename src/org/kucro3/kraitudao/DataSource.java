@@ -1,18 +1,30 @@
 package org.kucro3.kraitudao;
 
+import java.util.Arrays;
+import java.util.Collection;
+
 @SuppressWarnings("unchecked")
 public interface DataSource {
-    public default void query(Object object) throws DataSourceException
+    public default void pull(Object object) throws DataSourceException
     {
-        query(object, (Class) object.getClass());
+        pull(object, (Class) object.getClass());
     }
 
-    public <T> void query(T object, Class<T> type) throws DataSourceException;
+    public <T> void pull(T object, Class<T> type) throws DataSourceException;
 
-    public default void commit(Object object) throws DataSourceException
+    public <T> Collection<T> pull(Class<T> type) throws DataSourceException;
+
+    public default Transition commit(Collection<Object> objects) throws DataSourceException
     {
-        commit(object, (Class) object.getClass());
+        return commit(null, objects);
     }
 
-    public <T> void commit(T object, Class<T> type) throws DataSourceException;
+    public Transition commit(Transition transition, Collection<Object> objects) throws DataSourceException;
+
+    public default <T> Transition commit(T object, Class<T> type) throws DataSourceException
+    {
+        return commit(null, object, type);
+    }
+
+    public <T> Transition commit(Transition transition, T object, Class<T> type) throws DataSourceException;
 }

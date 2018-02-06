@@ -39,12 +39,12 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
 
     private MultipleDataObject getMultiple0(Class<?> type)
     {
-
+        return null;
     }
 
     private UniqueDataObject getUnique0(Class<?> type)
     {
-
+        return null;
     }
 
     private boolean isMultiple(Class<?> type)
