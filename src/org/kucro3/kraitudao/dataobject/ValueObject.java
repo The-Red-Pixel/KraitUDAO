@@ -1,5 +1,7 @@
 package org.kucro3.kraitudao.dataobject;
 
+import java.util.Optional;
+
 public interface ValueObject {
     public String getName();
 
@@ -25,4 +27,6 @@ public interface ValueObject {
     public boolean isPrimaryKey();
 
     public boolean isSecondaryKey();
+
+    public Optional<ExpandRule> getExpandRule();
 }
