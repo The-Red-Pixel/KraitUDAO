@@ -1,6 +1,5 @@
 package org.kucro3.kraitudao;
 
-import java.util.Arrays;
 import java.util.Collection;
 
 @SuppressWarnings("unchecked")
