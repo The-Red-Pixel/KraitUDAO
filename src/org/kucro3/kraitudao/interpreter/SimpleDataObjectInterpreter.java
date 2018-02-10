@@ -73,7 +73,60 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
 
     private final Map<Class<?>, DataObject> cached = new HashMap<>();
 
+    private static class SimpleDataObjectBuilder
+    {
+        private SimpleDataObjectBuilder(Class<?> type)
+        {
+            this.type = type;
+        }
 
+        SimpleDataObjectImpl build()
+        {
+            return new SimpleDataObjectImpl(type, map);
+        }
+
+        private final Class<?> type;
+
+        private final Map<String, SimpleValueObjectImpl> map = new HashMap<>();
+    }
+
+    private static class SimpleValueObjectBuilder
+    {
+        private SimpleValueObjectBuilder(boolean multiple)
+        {
+            this.multiple = multiple;
+        }
+
+        SimpleValueObjectBuilder key()
+        {
+            if(multiple)
+                throw new DataObjectMalformationException("Found @Key annotation in multiple data object");
+            primaryKey = true;
+            return this;
+        }
+
+        SimpleValueObjectBuilder primaryKey()
+        {
+            if(!multiple)
+                throw new DataObjectMalformationException("Found @PrimaryKey annotation in unique data object");
+            primaryKey = true;
+            return this;
+        }
+
+        SimpleValueObjectBuilder secondaryKey()
+        {
+            if(!multiple)
+                throw new DataObjectMalformationException("Found @SecondaryKey annotation in unique data object");
+            secondaryKey = true;
+            return this;
+        }
+
+        private boolean primaryKey;
+
+        private boolean secondaryKey;
+
+        private final boolean multiple;
+    }
 
     private static class SimpleDataObjectImpl implements DataObject
     {
