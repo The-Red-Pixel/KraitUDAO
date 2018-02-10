@@ -5,6 +5,8 @@ import org.kucro3.kraitudao.annotations.expandable.At;
 public interface ExpandRule {
     public Class<?> getExpandingType();
 
+    public Entry[] getEntries();
+
     public interface Entry {
         public String name();
 
