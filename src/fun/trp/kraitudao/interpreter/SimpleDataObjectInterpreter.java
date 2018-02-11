@@ -77,9 +77,18 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
 
     private static class SimpleDataObjectBuilder
     {
-        private SimpleDataObjectBuilder(Class<?> type)
+        private SimpleDataObjectBuilder(Set<String> names, Class<?> type)
         {
+            this.names = names;
             this.type = type;
+        }
+
+        SimpleDataObjectBuilder valueObject(ValueObject valueObject)
+        {
+            if(!names.add(valueObject.getName()))
+                throw new DataObjectMalformationException("Duplicated value object name");
+            this.map.put(valueObject.getName(), valueObject);
+            return this;
         }
 
         SimpleDataObjectImpl build()
@@ -89,7 +98,9 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
 
         private final Class<?> type;
 
-        private final Map<String, SimpleValueObjectImpl> map = new HashMap<>();
+        private final Set<String> names;
+
+        private final Map<String, ValueObject> map = new HashMap<>();
     }
 
     private static class SimpleValueObjectBuilder
@@ -125,51 +136,62 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
 
         SimpleValueObjectBuilder type(Class<?> type)
         {
-            if(this.type != null)
-                throw new DataObjectMalformationException("Duplicated type");
             this.type = type;
             return this;
         }
 
         SimpleValueObjectBuilder name(String name)
         {
-            if(this.name != null)
-                throw new DataObjectMalformationException("Duplicated name");
             this.name = name;
             return this;
         }
 
         SimpleValueObjectBuilder owner(DataObject owner)
         {
-            if(this.owner != null)
-                throw new DataObjectMalformationException("Duplicated owner");
             this.owner = owner;
             return this;
         }
 
         SimpleValueObjectBuilder ownerType(Class<?> ownerType)
         {
-            if(this.ownerType != null)
-                throw new DataObjectMalformationException("Duplicated ownerType");
             this.ownerType = ownerType;
             return this;
         }
 
         SimpleValueObjectBuilder getter(Getter getter)
         {
-            if(this.getter != null)
-                throw new DataObjectMalformationException("Duplicated getter");
             this.getter = getter;
             return this;
         }
 
         SimpleValueObjectBuilder setter(Setter setter)
         {
-            if(this.setter != null)
-                throw new DataObjectMalformationException("Duplicated setter");
             this.setter = setter;
             return this;
         }
+
+        SimpleValueObjectBuilder expandRule(ExpandRule rule)
+        {
+            this.expandRule = rule;
+            return this;
+        }
+
+        ValueObject build()
+        {
+            return new SimpleValueObjectImpl(
+                    name,
+                    primaryKey,
+                    secondaryKey,
+                    owner,
+                    ownerType,
+                    type,
+                    expandRule,
+                    getter,
+                    setter
+            );
+        }
+
+        private ExpandRule expandRule;
 
         private String name;
 
@@ -188,6 +210,79 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
         private Setter setter;
 
         private final boolean multiple;
+    }
+
+    private static class SimpleExpandRuleBuilder
+    {
+        private SimpleExpandRuleBuilder(Set<String> names)
+        {
+            this.names = names;
+        }
+
+        SimpleExpandRuleBuilder expandingType(Class<?> expandingType)
+        {
+            this.expandingType = expandingType;
+            return this;
+        }
+
+        SimpleExpandRuleBuilder entry(ExpandRule.Entry entry)
+        {
+            if(!names.add(entry.name()))
+                throw new DataObjectMalformationException("Duplicated value name: " + entry.name());
+            this.entires.add(entry);
+            return this;
+        }
+
+        ExpandRule build()
+        {
+            return new SimpleExpandRuleImpl(expandingType, entires.toArray(new ExpandRule.Entry[entires.size()]));
+        }
+
+        private final Set<String> names;
+
+        private final List<ExpandRule.Entry> entires = new ArrayList<>();
+
+        private Class<?> expandingType;
+    }
+
+    private static class SimpleExpandRuleEntryBuilder
+    {
+        SimpleExpandRuleEntryBuilder type(Class<?> type)
+        {
+            this.type = type;
+            return this;
+        }
+
+        SimpleExpandRuleEntryBuilder name(String name)
+        {
+            this.name = name;
+            return this;
+        }
+
+        SimpleExpandRuleEntryBuilder getter(At getter)
+        {
+            this.getter = getter;
+            return this;
+        }
+
+        SimpleExpandRuleEntryBuilder setter(At setter)
+        {
+            this.setter = setter;
+            return this;
+        }
+
+        ExpandRule.Entry build()
+        {
+            return new SimpleExpandRuleEntryImpl(name, type, getter, setter);
+        }
+
+        private At getter;
+
+        private At setter;
+
+        private Class<?> type;
+
+        private String name;
     }
 
     private static class SimpleExpandRuleImpl implements ExpandRule
@@ -293,7 +388,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
 
     private static class SimpleDataObjectImpl implements DataObject
     {
-        private SimpleDataObjectImpl(Class<?> type, Map<String, SimpleValueObjectImpl> map)
+        private SimpleDataObjectImpl(Class<?> type, Map<String, ValueObject> map)
         {
             this.type = type;
             this.valueMap = Collections.unmodifiableMap(map);
@@ -308,7 +403,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
         @Override
         public Map<String, ValueObject> getValues()
         {
-            return (Map) valueMap;
+            return valueMap;
         }
 
         @Override
@@ -319,7 +414,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
 
         private final Class<?> type;
 
-        final Map<String, SimpleValueObjectImpl> valueMap;
+        final Map<String, ValueObject> valueMap;
     }
 
     private static class SimpleValueObjectImpl implements ValueObject
