@@ -6,6 +6,8 @@ import fun.trp.kraitudao.annotations.expandable.At;
 import fun.trp.kraitudao.annotations.expandable.Source;
 import fun.trp.kraitudao.dataobject.*;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.*;
 
 @SuppressWarnings("unchecked")
@@ -571,5 +573,85 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
     private static interface Getter
     {
         Object get(Object object);
+    }
+
+    private static class FieldGetter implements Getter
+    {
+        private FieldGetter(Field field)
+        {
+            this.field = field;
+        }
+
+        @Override
+        public Object get(Object object)
+        {
+            try {
+                return field.get(object);
+            } catch (Exception e) {
+                throw new DataObjectError(e);
+            }
+        }
+
+        private final Field field;
+    }
+
+    private static class FieldSetter implements Setter
+    {
+        private FieldSetter(Field field)
+        {
+            this.field = field;
+        }
+
+        @Override
+        public void set(Object object, Object value)
+        {
+            try {
+                field.set(object, value);
+            } catch (Exception e) {
+                throw new DataObjectException(e);
+            }
+        }
+
+        private final Field field;
+    }
+
+    private static class MethodGetter implements Getter
+    {
+        private MethodGetter(Method method)
+        {
+            this.method = method;
+        }
+
+        @Override
+        public Object get(Object object)
+        {
+            try {
+                return method.invoke(object);
+            } catch (Exception e) {
+                throw new DataObjectException(e);
+            }
+        }
+
+        private final Method method;
+    }
+
+    private static class MethodSetter implements Setter
+    {
+        private MethodSetter(Method method)
+        {
+            this.method = method;
+        }
+
+        @Override
+        public void set(Object object, Object value)
+        {
+            try {
+                method.invoke(object, value);
+            } catch (Exception e) {
+                throw new DataObjectException(e);
+            }
+        }
+
+        private final Method method;
     }
 }
