@@ -98,6 +98,8 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
             return new SimpleDataObjectImpl(type, map);
         }
 
+        private Boolean multiple;
+
         private final Class<?> type;
 
         private final Set<String> names;
