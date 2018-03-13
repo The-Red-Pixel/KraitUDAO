@@ -1,6 +1,6 @@
 package com.theredpixelteam.kraitudao.dataobject;
 
-import java.util.Collection;
+import java.util.Map;
 import java.util.Optional;
 
 public interface MultipleDataObject extends DataObject {
@@ -21,7 +21,7 @@ public interface MultipleDataObject extends DataObject {
         return Optional.empty();
     }
 
-    public Collection<ValueObject> getSecondaryKeys();
+    public Map<String, ValueObject> getSecondaryKeys();
 
     public default boolean isSecondaryKey(String name)
     {
@@ -30,12 +30,6 @@ public interface MultipleDataObject extends DataObject {
 
     public default Optional<ValueObject> getSecondaryKey(String name)
     {
-        Collection<ValueObject> secondaryKeys = getSecondaryKeys();
-
-        for(ValueObject object : secondaryKeys)
-            if(object.getName().equals(name))
-                return Optional.of(object);
-
-        return Optional.empty();
+        return Optional.ofNullable(getSecondaryKeys().get(name));
     }
 }
