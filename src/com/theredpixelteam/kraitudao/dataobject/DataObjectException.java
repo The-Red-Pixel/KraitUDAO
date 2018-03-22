@@ -29,4 +29,9 @@ public class DataObjectException extends RuntimeException {
     {
         return new DataObjectException("Incapable value: Type of " + value.getClass().getCanonicalName() + "(" + expected.getCanonicalName() + " expected)");
     }
+
+    public static DataObjectException IncapableObject(Object object, Class<?> expected)
+    {
+        return new DataObjectException("Incapable object: Type of " + object.getClass().getCanonicalName() + "(" + expected.getCanonicalName() + " expected)");
+    }
 }

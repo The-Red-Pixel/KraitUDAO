@@ -34,10 +34,15 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
 
         void seal()
         {
+            if(this.sealed)
+                throw new IllegalStateException();
+
             if(this.key == null)
                 throw new DataObjectMalformationException("Key not defined");
 
             this.data = Collections.unmodifiableMap(data);
+
+            this.sealed = true;
         }
 
         @Override
@@ -69,6 +74,8 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
         ValueObject key;
 
         Map<String, ValueObject> data;
+
+        private boolean sealed;
     }
 
     private static class MultipleDataObjectContainer implements MultipleDataObject
@@ -76,15 +83,21 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
         MultipleDataObjectContainer(Class<?> type)
         {
             this.type = type;
+            this.secondaryKeys = new HashMap<>();
         }
 
         void seal()
         {
+            if(this.sealed)
+                throw new IllegalStateException();
+
             if(this.primaryKey == null)
                 throw new DataObjectMalformationException("Primary Key not defined");
 
             this.secondaryKeys = Collections.unmodifiableMap(secondaryKeys);
             this.values = Collections.unmodifiableMap(values);
+
+            this.sealed = true;
         }
 
         @Override
@@ -124,5 +137,165 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
         Map<String, ValueObject> secondaryKeys;
 
         Map<String, ValueObject> values;
+
+        private boolean sealed;
+    }
+
+    private static class ValueObjectContainer implements ValueObject
+    {
+        ValueObjectContainer(Class<?> owner, String name, Class<?> type)
+        {
+            this.ownerType = owner;
+            this.name = name;
+            this.type = type;
+        }
+
+        void seal()
+        {
+            if(this.sealed)
+                throw new IllegalStateException();
+
+            if(owner == null)
+                throw new DataObjectMalformationException("null owner");
+
+            if(getter == null)
+                throw new DataObjectMalformationException("null getter");
+
+            if(setter == null)
+                throw new DataObjectMalformationException("null setter");
+
+            this.sealed = true;
+        }
+
+        @Override
+        public String getName()
+        {
+            return this.name;
+        }
+
+        @Override
+        public Class<?> getType()
+        {
+            return this.type;
+        }
+
+        @Override
+        public Object get(Object object)
+        {
+            Objects.requireNonNull(object, "object");
+
+            return get0(object);
+        }
+
+        @Override
+        public <T> T get(Object object, Class<T> type)
+        {
+            Objects.requireNonNull(object, "object");
+            Objects.requireNonNull(type, "type");
+
+            if(!this.ownerType.isInstance(object))
+                throw DataObjectException.IncapableObject(object, this.ownerType);
+
+            Object returned = get(object);
+
+            if(returned == null)
+                return null;
+
+            if(!(type.isInstance(object)))
+                throw DataObjectException.IncapableType(returned.getClass(), type);
+
+            return (T) object;
+        }
+
+        Object get0(Object object)
+        {
+            return getter.get(object);
+        }
+
+        @Override
+        public void set(Object object, Object value)
+        {
+            set(object, value, (Class) type);
+        }
+
+        @Override
+        public <T> void set(Object object, T value, Class<T> type)
+        {
+            Objects.requireNonNull(object, "object");
+            Objects.requireNonNull(type, "type");
+
+            if(!this.ownerType.isInstance(object))
+                throw DataObjectException.IncapableObject(object, this.ownerType);
+
+            if(!type.isInstance(value))
+                throw DataObjectException.IncapableValue(value, type);
+
+            set0(object, value);
+        }
+
+        void set0(Object object, Object value)
+        {
+            setter.set(object, value);
+        }
+
+        @Override
+        public Class<?> getOwnerType()
+        {
+            return ownerType;
+        }
+
+        @Override
+        public DataObject getOwner()
+        {
+            return owner;
+        }
+
+        @Override
+        public boolean isPrimaryKey()
+        {
+            return primaryKey;
+        }
+
+        @Override
+        public boolean isSecondaryKey()
+        {
+            return secondaryKey;
+        }
+
+        @Override
+        public Optional<ExpandRule> getExpandRule()
+        {
+            return Optional.ofNullable(this.expandRule);
+        }
+
+        final Class<?> ownerType;
+
+        final String name;
+
+        final Class<?> type;
+
+        boolean primaryKey;
+
+        boolean secondaryKey;
+
+        DataObject owner;
+
+        ExpandRule expandRule;
+
+        Getter getter;
+
+        Setter setter;
+
+        private boolean sealed;
+
+        private static interface Getter
+        {
+            Object get(Object object);
+        }
+
+        private static interface Setter
+        {
+            void set(Object object, Object value);
+        }
     }
 }
