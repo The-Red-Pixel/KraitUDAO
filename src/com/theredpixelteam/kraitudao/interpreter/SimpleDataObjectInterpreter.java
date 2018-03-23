@@ -24,6 +24,16 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
         return null;
     }
 
+    private MultipleDataObject getMultiple0(Class<?> type) throws DataObjectInterpretationException
+    {
+
+    }
+
+    private UniqueDataObject getUnique0(Class<?> type) throws DataObjectInterpretationException
+    {
+
+    }
+
     private static class UniqueDataObjectContainer implements UniqueDataObject
     {
         UniqueDataObjectContainer(Class<?> type)
@@ -297,5 +307,100 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
         {
             void set(Object object, Object value);
         }
+    }
+
+    private static class ExpandRuleContainer implements ExpandRule
+    {
+        ExpandRuleContainer(Class<?> type)
+        {
+            this.type = type;
+        }
+
+        void seal()
+        {
+            if(this.sealed)
+                throw new IllegalStateException();
+
+            this.entryList.toArray(this.entries = new Entry[this.entryList.size()]);
+
+            this.sealed = true;
+        }
+
+        @Override
+        public Class<?> getExpandingType()
+        {
+            return this.type;
+        }
+
+        @Override
+        public Entry[] getEntries()
+        {
+            return Arrays.copyOf(entries, entries.length);
+        }
+
+        List<Entry> entryList = new ArrayList<>();
+
+        final Class<?> type;
+
+        private Entry[] entries;
+
+        private boolean sealed;
+    }
+
+    private static class EntryContainer implements ExpandRule.Entry
+    {
+        EntryContainer(String name, Class<?> expandedType)
+        {
+            this.name = name;
+            this.expandedType = expandedType;
+        }
+
+        void seal()
+        {
+            if(this.sealed)
+                throw new IllegalStateException();
+
+            if(this.getterInfo == null)
+                throw new DataObjectMalformationException("Getter info undefined");
+
+            if(this.setterInfo == null)
+                throw new DataObjectMalformationException("Setter info undefined");
+
+            this.sealed = true;
+        }
+
+        @Override
+        public String name()
+        {
+            return this.name;
+        }
+
+        @Override
+        public ExpandRule.At getterInfo()
+        {
+            return this.getterInfo;
+        }
+
+        @Override
+        public ExpandRule.At setterInfo()
+        {
+            return this.setterInfo;
+        }
+
+        @Override
+        public Class<?> getExpandedType()
+        {
+            return this.expandedType;
+        }
+
+        ExpandRule.At getterInfo;
+
+        ExpandRule.At setterInfo;
+
+        final Class<?> expandedType;
+
+        final String name;
+
+        private boolean sealed;
     }
 }
