@@ -1,9 +1,14 @@
 package com.theredpixelteam.kraitudao.interpreter;
 
-import com.theredpixelteam.kraitudao.annotations.Multiple;
-import com.theredpixelteam.kraitudao.annotations.Unique;
+import com.theredpixelteam.kraitudao.annotations.*;
+import com.theredpixelteam.kraitudao.annotations.expandable.*;
 import com.theredpixelteam.kraitudao.dataobject.*;
+import com.theredpixelteam.redtea.predication.MultiCondition;
+import com.theredpixelteam.redtea.predication.MultiPredicate;
+import com.theredpixelteam.redtea.predication.NamedPredicate;
 
+import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
 import java.util.*;
 
 @SuppressWarnings("unchecked")
@@ -65,6 +70,27 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
     {
 
     }
+
+    static NamedPredicate<AnnotatedElement, Class<?>> a(Class<? extends Annotation> annotation)
+    {
+        return NamedPredicate.of(annotation, (t) -> t.getAnnotation(annotation) != null);
+    }
+
+    private static final MultiCondition<AnnotatedElement, Class<?>> annotationCondition =
+            MultiCondition.of(MultiPredicate.<AnnotatedElement, Class<?>>builder()
+                    .next(a(Unique.class))
+                    .next(a(Multiple.class))
+                    .next(a(Key.class))
+                    .next(a(PrimaryKey.class))
+                    .next(a(SecondaryKey.class))
+                    .next(a(Value.class))
+                    .next(a(Getter.class))
+                    .next(a(Setter.class))
+                    .next(a(Inheritance.class))
+                    .next(a(BuiltinExpandRule.class))
+                    .next(a(CustomExpandRule.class))
+                    .next(a(ExpandableValue.class))
+            .build());
 
     private static class UniqueDataObjectContainer implements UniqueDataObject
     {
