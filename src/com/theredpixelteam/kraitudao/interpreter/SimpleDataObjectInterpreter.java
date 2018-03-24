@@ -1,5 +1,7 @@
 package com.theredpixelteam.kraitudao.interpreter;
 
+import com.theredpixelteam.kraitudao.annotations.Multiple;
+import com.theredpixelteam.kraitudao.annotations.Unique;
 import com.theredpixelteam.kraitudao.dataobject.*;
 
 import java.util.*;
@@ -9,19 +11,49 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
     @Override
     public DataObject get(Class<?> type) throws DataObjectInterpretationException
     {
-        return null;
+        Objects.requireNonNull(type, "type");
+
+        int i = (type.getAnnotation(Unique.class) == null ? 0b00 : 0b01)
+                | (type.getAnnotation(Multiple.class) == null ? 0b00 : 0b10);
+
+        switch(i)
+        {
+            case 0b00: // not annotated
+                throw new DataObjectInterpretationException("Metadata annotation not found in type: " + type.getCanonicalName());
+
+            case 0b01: // only annotated by @Unique
+                return getUnique0(type);
+
+            case 0b10: // only annotated by @Multiple
+                return getMultiple0(type);
+
+            case 0b11: // both annotated
+                throw new DataObjectInterpretationException("Duplicated metadata annotation in type: " + type.getCanonicalName());
+        }
+
+        throw new IllegalStateException("Should not reach here");
     }
 
     @Override
     public MultipleDataObject getMultiple(Class<?> type) throws DataObjectInterpretationException
     {
-        return null;
+        Objects.requireNonNull(type, "type");
+
+        if(type.getAnnotation(Multiple.class) == null)
+            throw new DataObjectInterpretationException("Type: " + type.getCanonicalName() + " is not annotated by @Multiple");
+
+        return getMultiple0(type);
     }
 
     @Override
     public UniqueDataObject getUnique(Class<?> type) throws DataObjectInterpretationException
     {
-        return null;
+        Objects.requireNonNull(type, "type");
+
+        if(type.getAnnotation(Unique.class) == null)
+            throw new DataObjectInterpretationException("Type: " + type.getCanonicalName() + " is not annotated by @Unique");
+
+        return getUnique0(type);
     }
 
     private MultipleDataObject getMultiple0(Class<?> type) throws DataObjectInterpretationException
