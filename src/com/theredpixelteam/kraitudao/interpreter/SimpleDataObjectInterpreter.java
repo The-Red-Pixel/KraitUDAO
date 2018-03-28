@@ -87,30 +87,53 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
                     .next(a(Getter.class))
                     .next(a(Setter.class))
                     .next(a(Inheritance.class))
-                    .next(a(BuiltinExpandRule.class))
-                    .next(a(CustomExpandRule.class))
+//                  .next(a(BuiltinExpandRule.class))
+//                  .next(a(CustomExpandRule.class))
                     .next(a(ExpandableValue.class))
             .build());
 
-    private static class UniqueDataObjectContainer implements UniqueDataObject
+    private static interface DataObjectContainer
+    {
+        void putKey(KeyType type, ValueObject valueObject);
+
+        void putValue(ValueObject valueObject);
+
+        void seal();
+
+        boolean sealed();
+
+        default void checkSeal()
+        {
+            if(sealed())
+                throw new IllegalStateException("Already sealed");
+        }
+    }
+
+    private static class UniqueDataObjectContainer implements UniqueDataObject, DataObjectContainer
     {
         UniqueDataObjectContainer(Class<?> type)
         {
-            this.data = new HashMap<>();
+            this.values = new HashMap<>();
             this.type = type;
         }
 
-        void seal()
+        @Override
+        public void seal()
         {
-            if(this.sealed)
-                throw new IllegalStateException();
+            this.checkSeal();
 
             if(this.key == null)
                 throw new DataObjectMalformationException("Key not defined");
 
-            this.data = Collections.unmodifiableMap(data);
+            this.values = Collections.unmodifiableMap(values);
 
             this.sealed = true;
+        }
+
+        @Override
+        public boolean sealed()
+        {
+            return sealed;
         }
 
         @Override
@@ -122,13 +145,13 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
         @Override
         public Optional<ValueObject> getValue(String name)
         {
-            return Optional.ofNullable(data.get(name));
+            return Optional.ofNullable(values.get(name));
         }
 
         @Override
         public Map<String, ValueObject> getValues()
         {
-            return data;
+            return values;
         }
 
         @Override
@@ -137,16 +160,39 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
             return type;
         }
 
+        @Override
+        public void putKey(KeyType type, ValueObject valueObject)
+        {
+            this.checkSeal();
+
+            if(!type.equals(KeyType.PRIMARY))
+                throw new DataObjectMalformationException("@PrimaryKey and @SecondaryKey is not supported in unique data object");
+
+            if(key != null)
+                throw new DataObjectMalformationException("Primary key already exists");
+
+            this.key = valueObject;
+        }
+
+        @Override
+        public void putValue(ValueObject valueObject)
+        {
+            this.checkSeal();
+
+            if((values.putIfAbsent(valueObject.getName(), valueObject)) != null)
+                throw new DataObjectMalformationException("Duplicated value object: " + valueObject.getName());
+        }
+
         final Class<?> type;
 
         ValueObject key;
 
-        Map<String, ValueObject> data;
+        Map<String, ValueObject> values;
 
         private boolean sealed;
     }
 
-    private static class MultipleDataObjectContainer implements MultipleDataObject
+    private static class MultipleDataObjectContainer implements MultipleDataObject, DataObjectContainer
     {
         MultipleDataObjectContainer(Class<?> type)
         {
@@ -154,10 +200,39 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
             this.secondaryKeys = new HashMap<>();
         }
 
-        void seal()
+        @Override
+        public void putKey(KeyType type, ValueObject valueObject)
         {
-            if(this.sealed)
-                throw new IllegalStateException();
+            this.checkSeal();
+
+            switch(type)
+            {
+                case UNIQUE:
+                    throw new DataObjectMalformationException("@Key is not supported in multiple data object (Or you/they should use @PrimaryKey maybe?)");
+
+                case PRIMARY:
+                    if(this.primaryKey != null)
+                        throw new DataObjectMalformationException("Duplicated primary key");
+
+                case SECONDARY:
+                    if((secondaryKeys.putIfAbsent(valueObject.getName(), valueObject)) != null)
+                        throw new DataObjectMalformationException("Duplicated secondary key: " + valueObject.getName());
+            }
+        }
+
+        @Override
+        public void putValue(ValueObject valueObject)
+        {
+            this.checkSeal();
+
+            if((values.putIfAbsent(valueObject.getName(), valueObject)) != null)
+                throw new DataObjectMalformationException("Duplicated value object: " + valueObject.getName());
+        }
+
+        @Override
+        public void seal()
+        {
+            this.checkSeal();
 
             if(this.primaryKey == null)
                 throw new DataObjectMalformationException("Primary Key not defined");
@@ -166,6 +241,12 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
             this.values = Collections.unmodifiableMap(values);
 
             this.sealed = true;
+        }
+
+        @Override
+        public boolean sealed()
+        {
+            return sealed;
         }
 
         @Override
@@ -460,5 +541,12 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
         final String name;
 
         private boolean sealed;
+    }
+
+    private static enum KeyType
+    {
+        UNIQUE,
+        PRIMARY,
+        SECONDARY
     }
 }
