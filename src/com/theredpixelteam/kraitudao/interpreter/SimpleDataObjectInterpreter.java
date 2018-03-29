@@ -6,9 +6,11 @@ import com.theredpixelteam.kraitudao.dataobject.*;
 import com.theredpixelteam.redtea.predication.MultiCondition;
 import com.theredpixelteam.redtea.predication.MultiPredicate;
 import com.theredpixelteam.redtea.predication.NamedPredicate;
+import com.theredpixelteam.redtea.util.Reference;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
+import java.lang.reflect.Field;
 import java.util.*;
 
 @SuppressWarnings("unchecked")
@@ -65,7 +67,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
     {
         MultipleDataObjectContainer container = new MultipleDataObjectContainer(type);
 
-        // TODO
+        parse(container);
 
         return container;
     }
@@ -74,9 +76,68 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
     {
         UniqueDataObjectContainer container = new UniqueDataObjectContainer(type);
 
-        // TODO
+        parse(container);
 
         return container;
+    }
+
+    private void parse(DataObjectContainer container) throws DataObjectInterpretationException
+    {
+
+    }
+
+    private void parseFields(DataObjectContainer container)
+    {
+        for(Field field : container.getClass().getDeclaredFields())
+        {
+            MultiCondition.CurrentCondition<Class<?>> current;
+
+            current = annotationCondition.apply(
+                    field,
+                    Key.class,
+                    PrimaryKey.class,
+                    SecondaryKey.class
+            );
+
+            ValueObjectContainer valueObject = new ValueObjectContainer(container.getType(), field.getType());
+            valueObject.owner = container;
+
+            Reference<String> name = new Reference<>();
+            Reference<KeyType> keyType = new Reference<>();
+            current.completelyOnlyIf(Key.class)
+                        .perform(() -> {
+                            valueObject.primaryKey = true;
+                            keyType.set(KeyType.UNIQUE);
+                            name.set(field.getAnnotation(Key.class).value());
+                        })
+                    .elseCompletelyOnlyIf(PrimaryKey.class)
+                        .perform(() -> {
+                            valueObject.primaryKey = true;
+                            keyType.set(KeyType.PRIMARY);
+                            name.set(field.getAnnotation(PrimaryKey.class).value());
+                        })
+                    .elseCompletelyOnlyIf(SecondaryKey.class)
+                        .perform(() -> {
+                            valueObject.secondaryKey = true;
+                            keyType.set(KeyType.SECONDARY);
+                            name.set(field.getAnnotation(SecondaryKey.class).value());
+                        })
+                    .orElse((predicate) -> {
+                        if(predicate.trueCount() != 0)
+                            throw new DataObjectMalformationException("Duplicated value object metadata");
+                    });
+
+            valueObject.name = name.get();
+
+            // TODO getter, setter, expand rules
+
+            valueObject.seal();
+
+            if(valueObject.isKey())
+                container.putKey(keyType.get(), valueObject);
+            else
+                container.putValue(valueObject);
+        }
     }
 
     static NamedPredicate<AnnotatedElement, Class<?>> a(Class<? extends Annotation> annotation)
@@ -100,7 +161,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
                     .next(a(ExpandableValue.class))
             .build());
 
-    private static interface DataObjectContainer
+    private static interface DataObjectContainer extends DataObject
     {
         void putKey(KeyType type, ValueObject valueObject);
 
@@ -187,7 +248,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
         {
             this.checkSeal();
 
-            if((values.putIfAbsent(valueObject.getName(), valueObject)) != null)
+            if(key.getName().equals(valueObject.getName()) || (values.putIfAbsent(valueObject.getName(), valueObject) != null))
                 throw new DataObjectMalformationException("Duplicated value object: " + valueObject.getName());
         }
 
@@ -300,10 +361,9 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
 
     private static class ValueObjectContainer implements ValueObject
     {
-        ValueObjectContainer(Class<?> owner, String name, Class<?> type)
+        ValueObjectContainer(Class<?> owner, Class<?> type)
         {
             this.ownerType = owner;
-            this.name = name;
             this.type = type;
         }
 
@@ -311,6 +371,9 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
         {
             if(this.sealed)
                 throw new IllegalStateException();
+
+            if(name == null)
+                throw new DataObjectMalformationException("Value name undefined");
 
             if(owner == null)
                 throw new DataObjectMalformationException("null owner");
@@ -427,7 +490,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
 
         final Class<?> ownerType;
 
-        final String name;
+        String name;
 
         final Class<?> type;
 
