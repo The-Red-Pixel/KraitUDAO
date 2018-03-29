@@ -63,12 +63,20 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
 
     private MultipleDataObject getMultiple0(Class<?> type) throws DataObjectInterpretationException
     {
+        MultipleDataObjectContainer container = new MultipleDataObjectContainer(type);
 
+        // TODO
+
+        return container;
     }
 
     private UniqueDataObject getUnique0(Class<?> type) throws DataObjectInterpretationException
     {
+        UniqueDataObjectContainer container = new UniqueDataObjectContainer(type);
 
+        // TODO
+
+        return container;
     }
 
     static NamedPredicate<AnnotatedElement, Class<?>> a(Class<? extends Annotation> annotation)
