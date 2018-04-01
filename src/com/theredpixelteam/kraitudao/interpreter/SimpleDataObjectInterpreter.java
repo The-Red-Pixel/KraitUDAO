@@ -11,6 +11,7 @@ import com.theredpixelteam.redtea.util.Reference;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.*;
 
 @SuppressWarnings("unchecked")
@@ -86,7 +87,12 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
 
     }
 
-    private void parseFields(Class<?> type, DataObjectContainer container)
+    private void parseClass(Class<?> type, DataObjectContainer container, GlobalExpandRules globalRules)
+    {
+
+    }
+
+    private void parseFields(Class<?> type, DataObjectContainer container, GlobalExpandRules golbalRules)
     {
         for(Field field : container.getClass().getDeclaredFields())
         {
@@ -132,10 +138,12 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
 
                 valueObject.name = name.get();
             }
+            else
+                return;
 
-            // TODO getter, setter, expand rules
             field.setAccessible(true);
 
+            // getter
             valueObject.getter = (obj) -> {
                 try {
                     return field.get(obj);
@@ -144,6 +152,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
                 }
             };
 
+            // setter
             valueObject.setter = (obj, val) -> {
                 try {
                     field.set(obj, val);
@@ -152,6 +161,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
                 }
             };
 
+            // expand rule
             ExpandableValue expandInfo;
             if((expandInfo = field.getAnnotation(ExpandableValue.class)) != null)
             {
@@ -187,6 +197,14 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
                 container.putKey(keyType.get(), valueObject);
             else
                 container.putValue(valueObject);
+        }
+    }
+
+    private void parseMethods(Class<?> type, DataObjectContainer container)
+    {
+        for(Method method : type.getDeclaredMethods())
+        {
+
         }
     }
 
@@ -226,6 +244,10 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
             if(sealed())
                 throw new IllegalStateException("Already sealed");
         }
+    }
+
+    private static class GlobalExpandRules extends HashMap<String, ExpandRule>
+    {
     }
 
     private static class UniqueDataObjectContainer implements UniqueDataObject, DataObjectContainer
