@@ -99,37 +99,60 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
                     SecondaryKey.class
             );
 
+            Reference<KeyType> keyType = new Reference<>();
             ValueObjectContainer valueObject = new ValueObjectContainer(container.getType(), field.getType());
             valueObject.owner = container;
 
-            Reference<String> name = new Reference<>();
-            Reference<KeyType> keyType = new Reference<>();
-            current.completelyOnlyIf(Key.class)
+            if(current.getCurrent().trueCount() != 0)
+            {
+                Reference<String> name = new Reference<>();
+
+                current.completelyOnlyIf(Key.class)
                         .perform(() -> {
                             valueObject.primaryKey = true;
                             keyType.set(KeyType.UNIQUE);
                             name.set(field.getAnnotation(Key.class).value());
                         })
-                    .elseCompletelyOnlyIf(PrimaryKey.class)
+                        .elseCompletelyOnlyIf(PrimaryKey.class)
                         .perform(() -> {
                             valueObject.primaryKey = true;
                             keyType.set(KeyType.PRIMARY);
                             name.set(field.getAnnotation(PrimaryKey.class).value());
                         })
-                    .elseCompletelyOnlyIf(SecondaryKey.class)
+                        .elseCompletelyOnlyIf(SecondaryKey.class)
                         .perform(() -> {
                             valueObject.secondaryKey = true;
                             keyType.set(KeyType.SECONDARY);
                             name.set(field.getAnnotation(SecondaryKey.class).value());
                         })
-                    .orElse((predicate) -> {
-                        if(predicate.trueCount() != 0)
-                            throw new DataObjectMalformationException("Duplicated value object metadata");
-                    });
+                        .orElse((predicate) -> {
+                            if (predicate.trueCount() != 0)
+                                throw new DataObjectMalformationException("Duplicated value object metadata");
+                        });
 
-            valueObject.name = name.get();
+                valueObject.name = name.get();
+            }
 
             // TODO getter, setter, expand rules
+            field.setAccessible(true);
+
+            valueObject.getter = (obj) -> {
+                try {
+                    return field.get(obj);
+                } catch (Exception e) {
+                    throw new DataObjectError("Reflection error", e);
+                }
+            };
+
+            valueObject.setter = (obj, val) -> {
+                try {
+                    field.set(obj, val);
+                } catch (Exception e) {
+                    throw new DataObjectError("Reflection error", e);
+                }
+            };
+
+
 
             valueObject.seal();
 
@@ -158,7 +181,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
                     .next(a(Inheritance.class))
 //                  .next(a(BuiltinExpandRule.class))
 //                  .next(a(CustomExpandRule.class))
-                    .next(a(ExpandableValue.class))
+//                  .next(a(ExpandableValue.class))
             .build());
 
     private static interface DataObjectContainer extends DataObject
@@ -167,7 +190,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
 
         void putValue(ValueObject valueObject);
 
-        void seal();
+        void seal(); // except internal update
 
         boolean sealed();
 
@@ -422,7 +445,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
                 return null;
 
             if(!(type.isInstance(object)))
-                throw DataObjectException.IncapableType(returned.getClass(), type);
+                throw new DataObjectError(DataObjectException.IncapableType(returned.getClass(), type));
 
             return (T) object;
         }
@@ -548,7 +571,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
             return Arrays.copyOf(entries, entries.length);
         }
 
-        List<Entry> entryList = new ArrayList<>();
+        ArrayList<Entry> entryList = new ArrayList<>();
 
         final Class<?> type;
 
