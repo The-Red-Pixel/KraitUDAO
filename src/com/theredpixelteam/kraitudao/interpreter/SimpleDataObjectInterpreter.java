@@ -12,6 +12,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.*;
 
 @SuppressWarnings("unchecked")
@@ -131,15 +132,14 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
                             keyType.set(KeyType.SECONDARY);
                             name.set(field.getAnnotation(SecondaryKey.class).value());
                         })
-                        .orElse((predicate) -> {
-                            if (predicate.trueCount() != 0)
-                                throw new DataObjectMalformationException("Duplicated value object metadata");
+                        .orElse(() -> {
+                            throw new DataObjectMalformationException("Duplicated value object metadata");
                         });
 
                 valueObject.name = name.get();
             }
             else
-                return;
+                continue;
 
             field.setAccessible(true);
 
@@ -204,7 +204,74 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
     {
         for(Method method : type.getDeclaredMethods())
         {
+            MultiCondition.CurrentCondition<Class<?>> current;
 
+            current = annotationCondition.apply(
+                    method,
+                    Setter.class,
+                    Getter.class
+            );
+
+            if(current.getCurrent().trueCount() == 0)
+                continue;
+
+            current.completelyOnlyIf(Getter.class)
+                    .perform(() -> {
+                        Getter getter = type.getAnnotation(Getter.class);
+                        int modifier = method.getModifiers();
+
+                        String name = getter.value();
+                        ValueObjectContainer valueObjectContainer =
+                                (ValueObjectContainer) container.getValue(name).orElseThrow(
+                                        () -> new DataObjectMalformationException("Invalid getter: No such value object \"" + name + "\""));
+
+                        if(!valueObjectContainer.getType().equals(method.getReturnType()))
+                            throw new DataObjectMalformationException("Invalid getter return type " +
+                                    "(Name: " + name + ", " +
+                                    "Declared: " + method.getReturnType().getCanonicalName() + ", " +
+                                    "Expected: " + container.getType().getCanonicalName() + ")");
+
+                        if(valueObjectContainer.getter instanceof ValueObjectContainer.RedirectedGetter) // check duplication
+                            throw new DataObjectMalformationException("Duplicated getter (Name: " + name + ")");
+
+                        if(Modifier.isStatic(modifier)) // static getter
+                        {
+                            Class<?>[] arguments = method.getParameterTypes();
+
+                            if(arguments.length != 1 || !arguments[0].equals(type))
+                                throw new DataObjectMalformationException("Invalid argument of static getter (Name: " + name + ")");
+
+                            method.setAccessible(true);
+                            valueObjectContainer.getter = (ValueObjectContainer.RedirectedGetter) (obj) -> {
+                                try {
+                                    return method.invoke(null, obj);
+                                } catch (Exception e) {
+                                    throw new DataObjectError("Reflection error", e);
+                                }
+                            };
+                        }
+                        else // non-static getter
+                        {
+                            if(method.getParameterCount() != 0)
+                                throw new DataObjectMalformationException("Invalid argument of getter (Name: " + name + ")");
+
+                            method.setAccessible(true);
+                            valueObjectContainer.getter = (ValueObjectContainer.RedirectedGetter) (obj) -> {
+                                try {
+                                    return method.invoke(obj);
+                                } catch (Exception e) {
+                                    throw new DataObjectError("Reflection error", e);
+                                }
+                            };
+                        }
+                    })
+                    .elseCompletelyOnlyIf(Setter.class)
+                    .perform(() -> {
+
+                    })
+                    .orElse(() -> {
+                        throw new DataObjectMalformationException("Duplicated method metadata");
+                    });
         }
     }
 
