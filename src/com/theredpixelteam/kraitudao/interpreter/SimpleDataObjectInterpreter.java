@@ -67,7 +67,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
     {
         MultipleDataObjectContainer container = new MultipleDataObjectContainer(type);
 
-        parse(container);
+        parse(type, container);
 
         return container;
     }
@@ -76,17 +76,17 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
     {
         UniqueDataObjectContainer container = new UniqueDataObjectContainer(type);
 
-        parse(container);
+        parse(type, container);
 
         return container;
     }
 
-    private void parse(DataObjectContainer container) throws DataObjectInterpretationException
+    private void parse(Class<?> type, DataObjectContainer container) throws DataObjectInterpretationException
     {
 
     }
 
-    private void parseFields(DataObjectContainer container)
+    private void parseFields(Class<?> type, DataObjectContainer container)
     {
         for(Field field : container.getClass().getDeclaredFields())
         {
@@ -152,7 +152,34 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
                 }
             };
 
+            ExpandableValue expandInfo;
+            if((expandInfo = field.getAnnotation(ExpandableValue.class)) != null)
+            {
+                Entry[] entries = expandInfo.entries();
 
+                if(entries.length == 0)
+                    throw new DataObjectMalformationException("Expand rule of \"" + field.getName() + "\" has no entry");
+
+                ExpandRuleContainer expandRuleContainer = new ExpandRuleContainer(field.getType());
+
+                for(Entry entry : entries)
+                {
+                    EntryContainer entryContainer = new EntryContainer(entry.name(), entry.type());
+
+                    At getterInfo = entry.getter();
+                    At setterInfo = entry.setter();
+
+                    entryContainer.getterInfo = new EntryContainer.AtInfo(getterInfo.name(), getterInfo.source());
+                    entryContainer.setterInfo = new EntryContainer.AtInfo(setterInfo.name(), setterInfo.source());
+
+                    entryContainer.seal();
+                    expandRuleContainer.entryList.add(entryContainer);
+                }
+
+                expandRuleContainer.seal();
+
+                valueObject.expandRule = expandRuleContainer;
+            }
 
             valueObject.seal();
 
@@ -536,9 +563,17 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
             Object get(Object object);
         }
 
+        private static interface RedirectedGetter extends Getter
+        {
+        }
+
         private static interface Setter
         {
             void set(Object object, Object value);
+        }
+
+        private static interface RedirectedSetter extends Setter
+        {
         }
     }
 
@@ -635,6 +670,31 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
         final String name;
 
         private boolean sealed;
+
+        private static class AtInfo implements ExpandRule.At
+        {
+            AtInfo(String name, Source source)
+            {
+                this.name = name;
+                this.source = source;
+            }
+
+            @Override
+            public String name()
+            {
+                return this.name;
+            }
+
+            @Override
+            public Source source()
+            {
+                return this.source;
+            }
+
+            final String name;
+
+            final Source source;
+        }
     }
 
     private static enum KeyType
