@@ -156,7 +156,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
 
     private void parseFields(Class<?> type, DataObjectContainer container, GlobalExpandRules golbalRules)
     {
-        for(Field field : container.getClass().getDeclaredFields())
+        for(Field field : type.getDeclaredFields())
         {
             MultiCondition.CurrentCondition<Class<?>> current;
 
@@ -170,6 +170,8 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
             Reference<KeyType> keyType = new Reference<>();
             ValueObjectContainer valueObject = new ValueObjectContainer(container.getType(), field.getType());
             valueObject.owner = container;
+
+            Value valueInfo;
 
             if(current.getCurrent().trueCount() != 0)
             {
@@ -197,8 +199,10 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
                             throw new DataObjectMalformationException("Duplicated value object metadata");
                         });
 
-                valueObject.name = name.get();
+                valueObject.name = name.get().isEmpty() ? field.getName() : name.get();
             }
+            else if((valueInfo = field.getAnnotation(Value.class)) != null)
+                valueObject.name = valueInfo.value().isEmpty() ? field.getName() : valueInfo.value();
             else
                 continue;
 
@@ -223,8 +227,8 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
             };
 
             // expand rule
-            ExpandableValue expandInfo;
-            if((expandInfo = field.getAnnotation(ExpandableValue.class)) != null)
+            Expandable expandInfo;
+            if((expandInfo = field.getAnnotation(Expandable.class)) != null)
             {
                 Entry[] entries = expandInfo.entries();
 
@@ -409,13 +413,13 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
                     .next(a(Key.class))
                     .next(a(PrimaryKey.class))
                     .next(a(SecondaryKey.class))
-                    .next(a(Value.class))
+//                  .next(a(Value.class))
                     .next(a(Getter.class))
                     .next(a(Setter.class))
                     .next(a(Inheritance.class))
 //                  .next(a(BuiltinExpandRule.class))
 //                  .next(a(CustomExpandRule.class))
-//                  .next(a(ExpandableValue.class))
+//                  .next(a(Expandable.class))
             .build());
 
     private static interface DataObjectContainer extends DataObject
@@ -495,7 +499,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
         {
             this.checkSeal();
 
-            if(!type.equals(KeyType.PRIMARY))
+            if(!type.equals(KeyType.UNIQUE))
                 throw new DataObjectMalformationException("@PrimaryKey and @SecondaryKey is not supported in unique data object");
 
             if(key != null)
