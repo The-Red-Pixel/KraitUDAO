@@ -238,8 +238,14 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
                         {
                             Class<?>[] arguments = method.getParameterTypes();
 
-                            if(arguments.length != 1 || !arguments[0].equals(type))
-                                throw new DataObjectMalformationException("Invalid argument of static getter (Name: " + name + ")");
+                            if(arguments.length != 1)
+                                throw new DataObjectMalformationException("Static getter should have (only) one argument (Name: " + name + ")");
+
+                            if(!arguments[0].equals(type))
+                                throw new DataObjectMalformationException("Invalid argument type of static getter " +
+                                        "(Name: " + name + ", " +
+                                        "Declared: " + arguments[0].getCanonicalName() + ", " +
+                                        "Expected: " + type.getCanonicalName() + ")");
 
                             method.setAccessible(true);
                             valueObjectContainer.getter = (ValueObjectContainer.RedirectedGetter) (obj) -> {
@@ -253,7 +259,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
                         else // non-static getter
                         {
                             if(method.getParameterCount() != 0)
-                                throw new DataObjectMalformationException("Invalid argument of getter (Name: " + name + ")");
+                                throw new DataObjectMalformationException("Non-static getter should not have any argument (Name: " + name + ")");
 
                             method.setAccessible(true);
                             valueObjectContainer.getter = (ValueObjectContainer.RedirectedGetter) (obj) -> {
@@ -267,7 +273,25 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
                     })
                     .elseCompletelyOnlyIf(Setter.class)
                     .perform(() -> {
+                        Setter setter = type.getAnnotation(Setter.class);
+                        int modifier = method.getModifiers();
 
+                        String name = setter.value();
+                        ValueObjectContainer valueObjectContainer =
+                                (ValueObjectContainer) container.getValue(name).orElseThrow(
+                                        () -> new DataObjectMalformationException("Invalid setter: No such value object \"" + name + "\""));
+
+                        if(valueObjectContainer.setter instanceof ValueObjectContainer.RedirectedSetter)
+                            throw new DataObjectMalformationException("Duplicated setter (Name: " + name + ")");
+
+                        if(Modifier.isStatic(modifier)) // static setter
+                        {
+
+                        }
+                        else // non-static setter
+                        {
+
+                        }
                     })
                     .orElse(() -> {
                         throw new DataObjectMalformationException("Duplicated method metadata");
