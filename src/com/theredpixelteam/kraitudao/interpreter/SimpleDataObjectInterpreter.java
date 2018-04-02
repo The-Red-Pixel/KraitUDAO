@@ -200,6 +200,31 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
         }
     }
 
+    static void checkArgumentCount(Class<?>[] arguments, int required, String location, String name)
+    {
+        if(arguments.length != required)
+            throw new DataObjectMalformationException(
+                    String.format("%d argument(s) reqiured, %d found (%s, Name: %s)",
+                            required,
+                            arguments.length,
+                            location,
+                            name)
+            );
+    }
+
+    static void checkArgument(Class<?>[] arguments, int index, Class<?> required, String location, String name)
+    {
+        if(!arguments[index].equals(required))
+            throw new DataObjectMalformationException(
+                    String.format("Invalid argument type of %s (Name: %s, Index: %d, Declared: %s, Expected: %s)",
+                            location,
+                            name,
+                            index,
+                            arguments[index].getCanonicalName(),
+                            required.getCanonicalName())
+            );
+    }
+
     private void parseMethods(Class<?> type, DataObjectContainer container)
     {
         for(Method method : type.getDeclaredMethods())
@@ -238,14 +263,9 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
                         {
                             Class<?>[] arguments = method.getParameterTypes();
 
-                            if(arguments.length != 1)
-                                throw new DataObjectMalformationException("Static getter should have (only) one argument (Name: " + name + ")");
+                            checkArgumentCount(arguments, 1, "Static Getter", name);
 
-                            if(!arguments[0].equals(type))
-                                throw new DataObjectMalformationException("Invalid argument type of static getter " +
-                                        "(Name: " + name + ", " +
-                                        "Declared: " + arguments[0].getCanonicalName() + ", " +
-                                        "Expected: " + type.getCanonicalName() + ")");
+                            checkArgument(arguments, 0, type, "Static Getter", name);
 
                             method.setAccessible(true);
                             valueObjectContainer.getter = (ValueObjectContainer.RedirectedGetter) (obj) -> {
@@ -286,11 +306,38 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
 
                         if(Modifier.isStatic(modifier)) // static setter
                         {
+                            Class<?>[] arguments = method.getParameterTypes();
 
+                            checkArgumentCount(arguments, 2, "Static Setter", name);
+
+                            checkArgument(arguments, 0, type, "Static Setter", name);
+                            checkArgument(arguments, 1, valueObjectContainer.getType(), "Static setter", name);
+
+                            method.setAccessible(true);
+                            valueObjectContainer.setter = (ValueObjectContainer.RedirectedSetter) (obj, val) -> {
+                                try {
+                                    method.invoke(null, obj, val);
+                                } catch (Exception e) {
+                                    throw new DataObjectError("Reflection error", e);
+                                }
+                            };
                         }
                         else // non-static setter
                         {
+                            Class<?>[] arguments = method.getParameterTypes();
 
+                            checkArgumentCount(arguments, 1, "Non-static Setter", name);
+
+                            checkArgument(arguments, 0, valueObjectContainer.getType(), "Non-static Setter", name);
+
+                            method.setAccessible(true);
+                            valueObjectContainer.setter = (ValueObjectContainer.RedirectedSetter) (obj, val) -> {
+                                try {
+                                    method.invoke(obj, val);
+                                } catch (Exception e) {
+                                    throw new DataObjectError("Reflection error", e);
+                                }
+                            };
                         }
                     })
                     .orElse(() -> {
