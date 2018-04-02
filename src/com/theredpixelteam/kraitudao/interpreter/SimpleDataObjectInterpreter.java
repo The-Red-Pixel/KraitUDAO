@@ -17,6 +17,16 @@ import java.util.*;
 
 @SuppressWarnings("unchecked")
 public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
+    public SimpleDataObjectInterpreter()
+    {
+        this(Collections.emptyMap());
+    }
+
+    public SimpleDataObjectInterpreter(Map<Class<?>, ExpandRule> bulitInRules)
+    {
+        this.bulitInRules = Collections.unmodifiableMap(bulitInRules);
+    }
+
     @Override
     public DataObject get(Class<?> type) throws DataObjectInterpretationException
     {
@@ -85,12 +95,63 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
 
     private void parse(Class<?> type, DataObjectContainer container) throws DataObjectInterpretationException
     {
+        GlobalExpandRules globalRules = new GlobalExpandRules();
 
+        try {
+            parseClass(type, container, globalRules);
+            parseFields(type, container, globalRules);
+            parseMethods(type, container);
+        } catch (Exception e) {
+            throw new DataObjectInterpretationException(e);
+        }
     }
 
     private void parseClass(Class<?> type, DataObjectContainer container, GlobalExpandRules globalRules)
     {
+        for(BuiltinExpandRule builtinRule : type.getAnnotationsByType(BuiltinExpandRule.class))
+        {
+            ExpandRule rule;
+            Class<?> expanding = builtinRule.value();
+            if((rule = this.bulitInRules.get(expanding)) == null)
+                throw new DataObjectMalformationException("Unsupported built-in expand rule (Type: " + expanding.getCanonicalName() + ")");
 
+            if(globalRules.putIfAbsent(expanding, rule) != null)
+                throw new DataObjectMalformationException("Duplicated expand rule declaration (Type: " + expanding.getCanonicalName() + ")");
+        }
+
+        for(CustomExpandRule customRule : type.getAnnotationsByType(CustomExpandRule.class))
+        {
+            Class<?> expanding = customRule.type();
+
+            if(globalRules.containsKey(expanding))
+                throw new DataObjectMalformationException("Duplicated expand rule declaration (Type: " + expanding.getCanonicalName() + ")");
+
+            ExpandRuleContainer expandRuleContainer = new ExpandRuleContainer(customRule.type());
+
+            if(customRule.entries().length == 0)
+                throw new DataObjectMalformationException("Global expand rule of type: \"" + expanding.getCanonicalName() + "\" has no entry");
+
+            parseExpandRuleEntries(expandRuleContainer, customRule.entries());
+
+            globalRules.put(expanding, expandRuleContainer);
+        }
+    }
+
+    private static void parseExpandRuleEntries(ExpandRuleContainer expandRuleContainer, Entry[] entries)
+    {
+        for(Entry entry : entries)
+        {
+            EntryContainer entryContainer = new EntryContainer(entry.name(), entry.type());
+
+            At getterInfo = entry.getter();
+            At setterInfo = entry.setter();
+
+            entryContainer.getterInfo = new EntryContainer.AtInfo(getterInfo.name(), getterInfo.source());
+            entryContainer.setterInfo = new EntryContainer.AtInfo(setterInfo.name(), setterInfo.source());
+
+            entryContainer.seal();
+            expandRuleContainer.entryList.add(entryContainer);
+        }
     }
 
     private void parseFields(Class<?> type, DataObjectContainer container, GlobalExpandRules golbalRules)
@@ -172,19 +233,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
 
                 ExpandRuleContainer expandRuleContainer = new ExpandRuleContainer(field.getType());
 
-                for(Entry entry : entries)
-                {
-                    EntryContainer entryContainer = new EntryContainer(entry.name(), entry.type());
-
-                    At getterInfo = entry.getter();
-                    At setterInfo = entry.setter();
-
-                    entryContainer.getterInfo = new EntryContainer.AtInfo(getterInfo.name(), getterInfo.source());
-                    entryContainer.setterInfo = new EntryContainer.AtInfo(setterInfo.name(), setterInfo.source());
-
-                    entryContainer.seal();
-                    expandRuleContainer.entryList.add(entryContainer);
-                }
+                parseExpandRuleEntries(expandRuleContainer, entries);
 
                 expandRuleContainer.seal();
 
@@ -351,6 +400,8 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
         return NamedPredicate.of(annotation, (t) -> t.getAnnotation(annotation) != null);
     }
 
+    private final Map<Class<?>, ExpandRule> bulitInRules;
+
     private static final MultiCondition<AnnotatedElement, Class<?>> annotationCondition =
             MultiCondition.of(MultiPredicate.<AnnotatedElement, Class<?>>builder()
                     .next(a(Unique.class))
@@ -384,7 +435,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
         }
     }
 
-    private static class GlobalExpandRules extends HashMap<String, ExpandRule>
+    private static class GlobalExpandRules extends HashMap<Class<?>, ExpandRule>
     {
     }
 
