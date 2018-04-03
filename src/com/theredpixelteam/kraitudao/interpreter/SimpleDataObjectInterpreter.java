@@ -168,7 +168,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
             );
 
             Reference<KeyType> keyType = new Reference<>();
-            ValueObjectContainer valueObject = new ValueObjectContainer(container.getType(), field.getType());
+            ValueObjectContainer valueObject = new ValueObjectContainer(container.getType(), field.getType(), COMPATIBLE_TYPES.get(field.getType()));
             valueObject.owner = container;
 
             Value valueInfo;
@@ -650,10 +650,11 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
 
     private static class ValueObjectContainer implements ValueObject
     {
-        ValueObjectContainer(Class<?> owner, Class<?> type)
+        ValueObjectContainer(Class<?> owner, Class<?> type, Class<?> compatibleType)
         {
             this.ownerType = owner;
             this.type = type;
+            this.compatibleType = compatibleType;
         }
 
         void seal()
@@ -736,7 +737,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
             if(!this.ownerType.isInstance(object))
                 throw DataObjectException.IncapableObject(object, this.ownerType);
 
-            if(!type.isInstance(value))
+            if(!type.isInstance(value) && (compatibleType == null || !compatibleType.isInstance(value)))
                 throw DataObjectException.IncapableValue(value, type);
 
             set0(object, value);
@@ -782,6 +783,8 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
         String name;
 
         final Class<?> type;
+
+        final Class<?> compatibleType; // boxing
 
         boolean primaryKey;
 
@@ -942,4 +945,18 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
         PRIMARY,
         SECONDARY
     }
+
+    private static final Map<Class<?>, Class<?>> COMPATIBLE_TYPES = new HashMap<Class<?>, Class<?>>()
+    {
+        {
+            put(boolean.class, Boolean.class);
+            put(byte.class, Byte.class);
+            put(char.class, Character.class);
+            put(short.class, Short.class);
+            put(int.class, Integer.class);
+            put(long.class, Long.class);
+            put(float.class, Float.class);
+            put(double.class, Double.class);
+        }
+    };
 }
