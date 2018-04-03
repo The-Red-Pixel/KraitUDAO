@@ -295,19 +295,19 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
 
             current.completelyOnlyIf(Getter.class)
                     .perform(() -> {
-                        Getter getter = type.getAnnotation(Getter.class);
+                        Getter getter = method.getAnnotation(Getter.class);
                         int modifier = method.getModifiers();
 
                         String name = getter.value();
                         ValueObjectContainer valueObjectContainer =
-                                (ValueObjectContainer) container.getValue(name).orElseThrow(
+                                (ValueObjectContainer) container.getValueObject(name).orElseThrow(
                                         () -> new DataObjectMalformationException("Invalid getter: No such value object \"" + name + "\""));
 
                         if(!valueObjectContainer.getType().equals(method.getReturnType()))
                             throw new DataObjectMalformationException("Invalid getter return type " +
                                     "(Name: " + name + ", " +
                                     "Declared: " + method.getReturnType().getCanonicalName() + ", " +
-                                    "Expected: " + container.getType().getCanonicalName() + ")");
+                                    "Expected: " + valueObjectContainer.getType().getCanonicalName() + ")");
 
                         if(valueObjectContainer.getter instanceof ValueObjectContainer.RedirectedGetter) // check duplication
                             throw new DataObjectMalformationException("Duplicated getter (Name: " + name + ")");
@@ -346,7 +346,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
                     })
                     .elseCompletelyOnlyIf(Setter.class)
                     .perform(() -> {
-                        Setter setter = type.getAnnotation(Setter.class);
+                        Setter setter = method.getAnnotation(Setter.class);
                         int modifier = method.getModifiers();
 
                         String name = setter.value();
@@ -483,6 +483,15 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
         }
 
         @Override
+        public Optional<ValueObject> getValueObject(String name)
+        {
+            if(name.equals(key.getName()))
+                return Optional.of(key);
+
+            return getValue(name);
+        }
+
+        @Override
         public Map<String, ValueObject> getValues()
         {
             return values;
@@ -559,7 +568,9 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
         {
             this.checkSeal();
 
-            if((values.putIfAbsent(valueObject.getName(), valueObject)) != null)
+            if(primaryKey.getName().equals(valueObject.getName())
+                    || secondaryKeys.containsKey(valueObject.getName())
+                    || (values.putIfAbsent(valueObject.getName(), valueObject)) != null)
                 throw new DataObjectMalformationException("Duplicated value object: " + valueObject.getName());
         }
 
@@ -599,6 +610,19 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
         public Optional<ValueObject> getValue(String name)
         {
             return Optional.ofNullable(values.get(name));
+        }
+
+        @Override
+        public Optional<ValueObject> getValueObject(String name)
+        {
+            if(name.equals(primaryKey.getName()))
+                return Optional.of(primaryKey);
+
+            ValueObject object;
+            if((object = secondaryKeys.get(name)) != null)
+                return Optional.of(object);
+
+            return getValue(name);
         }
 
         @Override

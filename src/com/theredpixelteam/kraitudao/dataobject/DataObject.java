@@ -16,6 +16,33 @@ public interface DataObject {
 
     public Optional<ValueObject> getValue(String name);
 
+    public Optional<ValueObject> getValueObject(String name);
+
+    public default boolean hasValueObject(String name)
+    {
+        return getValueObject(name).isPresent();
+    }
+
+    public default <T> boolean hasValueObject(String name, Class<T> type)
+    {
+        return getValueObject(name, type).isPresent();
+    }
+
+    public default <T> Optional<ValueObject> getValueObject(String name, Class<T> type)
+    {
+        Optional<ValueObject> optional = getValueObject(name);
+
+        if(!optional.isPresent())
+            return optional;
+
+        ValueObject valueObject = optional.get();
+
+        if(!valueObject.getType().equals(type))
+            return Optional.empty();
+
+        return Optional.of(valueObject);
+    }
+
     public default <T> Optional<ValueObject> getValue(String name, Class<T> type)
     {
         Optional<ValueObject> optional = getValue(name);
