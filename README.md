@@ -1,4 +1,5 @@
 # KraitUDAO
+> Krait Universal Data Access Object  
 > 超轻量级统一数据管理框架
 
 ## 数据对象类型
@@ -6,7 +7,7 @@
 ### 唯一数据对象 (UniqueDataObject)
 
 只含有一个主键值对象的数据对象(在数据存储介质中只能存在一个此主键值对应的数据条目)。  
-使用```@com.theredpixelteam.kraitudao.annotations.Unique```来注解数据对象类则表示该类所声明的数据对象为唯一数据对象（两种数据对象类型的注解不允许同时出现），如下：
+使用```@com.theredpixelteam.kraitudao.annotations.Unique```来注解数据对象类来表示该类所声明的数据对象为唯一数据对象（两种数据对象类型的注解不允许同时出现），如下：
 ```Java
 @Unique
 public class Example {
@@ -63,6 +64,20 @@ public class Example {
 ```
 
 ### 可重复数据对象 (MultipleDataObject)
+包含有一个主键值对象并且可以包含多个副键值对象的数据对象（在存储介质中一个主键值可以对应多个数据条目，而这些数据条目是跟据副键值来区分的，副键值不一定需要具有索引作用）  
+使用```@com.theredpixelteam.kraitudao.annotations.Multiple```来注解数据对象类l来表示该类所声明的数据对象为可重复数据对象（两种数据对象类型的注解不允许同时出现），如下：
+```Java
+@Multiple
+public class Example {
+    ... // your declarations here
+}
+```
+可重复数据对象支持一个主键对象与多个副键值对象，用以下其中一个来注解域：
+
+- ```@com.theredpixelteam.kraitudao.annotations.PrimaryKey```
+- ```@com.theredpixelteam.kraitudao.annotations.SecondaryKey``` 
+
+并且可以有多个```@SecondaryKey```注解的域而只允许且必须有一个```@PrimaryKey```注解的域。不允许使用```@com.theredpixelteam.kraitudao.annotations.Key```来注解任何域。
 
 ## 值与键值对象的命名
 - 所有键值与键都默认使用其对应的域的名称，并且都是可以通过修改注解来重新命名的。  
