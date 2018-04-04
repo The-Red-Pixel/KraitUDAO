@@ -11,7 +11,7 @@
 ```Java
 @Unique
 public class Example {
-    ... // your declarations here
+    // ... your declarations here
 }
 ```
 而其主键必须使用```@com.theredpixelteam.kraitudao.annotations.Key```注解  
@@ -27,7 +27,7 @@ public class Example {
     @Key // 不另取名称，主键值在存储介质中即名为 "exampleKey"
     private int exampleKey;
     
-    ... // other declarations here
+    // ... other declarations here
 }
 ```
 其中键值名称可以重新定义，如下：
@@ -37,7 +37,7 @@ public class Example {
     @Key("KEY") // 不另取名称为 "KEY"
     private int exampleKey;
     
-    ... // other declarations here
+    // ... other declarations here
 }
 ```
 值对象必须使用```@com.theredpixelteam.kraitudao.annotations.Value```注解，一个简单的唯一数据对象类应为如下形式：
@@ -69,7 +69,7 @@ public class Example {
 ```Java
 @Multiple
 public class Example {
-    ... // your declarations here
+    // ... your declarations here
 }
 ```
 可重复数据对象支持一个主键对象与多个副键值对象，用以下其中一个来注解域：
@@ -77,9 +77,77 @@ public class Example {
 - ```@com.theredpixelteam.kraitudao.annotations.PrimaryKey```
 - ```@com.theredpixelteam.kraitudao.annotations.SecondaryKey``` 
 
-并且可以有多个```@SecondaryKey```注解的域而只允许且必须有一个```@PrimaryKey```注解的域。不允许使用```@com.theredpixelteam.kraitudao.annotations.Key```来注解任何域。
+并且可以有多个```@SecondaryKey```注解的域而只允许且必须有一个```@PrimaryKey```注解的域。不允许使用```@com.theredpixelteam.kraitudao.annotations.Key```来注解任何域。如下：
+```Java
+@Multiple
+public class Example {
+    @PrimaryKey
+    private int primaryKey;
+    
+    @SecondaryKey
+    priavte int secondaryKey1;
+    
+    @SecondaryKey
+    private int secondaryKey2;
+    
+    // ... other declarations here
+}
+```
+并且所有键与副键值都可以重新命名：
+```Java
+@Multiple
+public class Example {
+    @PrimaryKey("KEY0") // 更名为 "KEY0"
+    private int primaryKey;
+    
+    @SecondaryKey("KEY1") // 更名为 "KEY1"
+    priavte int secondaryKey1;
+    
+    @SecondaryKey("KEY2") // 更名为 "KEY2"
+    private int secondaryKey2;
+    
+    // ... other declarations here
+}
+```
+值对象必须使用```@com.theredpixelteam.kraitudao.annotations.Value```注解，使用规则与上文相同。
 
 ## 值与键值对象的命名
+
 - 所有键值与键都默认使用其对应的域的名称，并且都是可以通过修改注解来重新命名的。  
 - 所有值与键值对象的名称并不强制大小写敏感，这与框架的具体实现方式相关，因此不建议使用字母相同且仅有大小写不相同的名称。
 - 请不要使用中文名称以导致各种奇怪的问题。
+
+## 原生数据
+通常情况下，原生数据包括以下类型：
+
+- boolean *(java.lang.Boolean)*
+- byte *(java.lang.Byte)*
+- short *(java.lang.Short)*
+- char *(java.lang.Character)*
+- int *(java.lang.Integer)*
+- long *(java.lang.Long)*
+- float *(java.lang.Float)*
+- double *(java.lang.Double)*
+- java.lang.String
+- java.math.BigDecimal
+
+原生数据即不需要通过任何的处理，直接、必须由具体实现支持的，可以直接或以某种形式存储入存储介质中而不需要使用者预处理的数据类型。 本数据结构框架同时要求具体实现对于非原生数据的支持，但需要使用者指定处理方式，详见下文。
+
+## 非原生数据类型的处理
+对于非原生数据结构，需要使用者指定将其拆解为原生数据的方式，才能将其存储进存储介质之中。而使用者指定的这一方式我们称其为```ExpandRule```（扩展规则）。
+
+### 内建扩展规则
+
+未完待续
+
+### 类全局扩展规则
+
+未完待续
+
+### 域扩展规则
+
+未完待续
+
+## 数据对象类继承
+
+未完待续
