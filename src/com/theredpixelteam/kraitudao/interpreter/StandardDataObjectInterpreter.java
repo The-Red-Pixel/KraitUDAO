@@ -17,13 +17,13 @@ import java.lang.reflect.Modifier;
 import java.util.*;
 
 @SuppressWarnings("unchecked")
-public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
-    public SimpleDataObjectInterpreter()
+public class StandardDataObjectInterpreter implements DataObjectInterpreter {
+    public StandardDataObjectInterpreter()
     {
         this(Collections.emptyMap());
     }
 
-    public SimpleDataObjectInterpreter(Map<Class<?>, ExpandRule> bulitInRules)
+    public StandardDataObjectInterpreter(Map<Class<?>, ExpandRule> bulitInRules)
     {
         this.bulitInRules = Collections.unmodifiableMap(bulitInRules);
     }
