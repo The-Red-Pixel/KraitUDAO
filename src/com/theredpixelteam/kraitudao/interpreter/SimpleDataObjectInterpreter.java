@@ -99,12 +99,14 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
         GlobalExpandRules globalRules = new GlobalExpandRules();
 
         try {
-            if(inherited)
+            if (inherited)
                 parse(type.getSuperclass(), container, type.getSuperclass().getAnnotation(Inheritance.class) != null, false);
 
             parseClass(type, container, globalRules, inherited, top);
             parseFields(type, container, globalRules, inherited, top);
             parseMethods(type, container, inherited, top);
+        } catch (DataObjectInterpretationException e) {
+            throw e;
         } catch (Exception e) {
             throw new DataObjectInterpretationException(e);
         }
@@ -295,8 +297,8 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
                     method,
                     Setter.class,
                     Getter.class,
-                    InheritedSetter.class,
-                    InheritedGetter.class
+                    OverrideSetter.class,
+                    OverrideGetter.class
             );
 
             if(current.getCurrent().trueCount() == 0)
@@ -325,7 +327,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
 
                         String name = setter.value();
                         ValueObjectContainer valueObjectContainer =
-                                (ValueObjectContainer) container.getValue(name).orElseThrow(
+                                (ValueObjectContainer) container.getValueObject(name).orElseThrow(
                                         () -> new DataObjectMalformationException("Invalid setter: No such value object \"" + name + "\""));
 
                         if(valueObjectContainer.setter instanceof ValueObjectContainer.RedirectedSetter) // check duplication
@@ -342,7 +344,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
                         String overriding = override.value();
 
                         ValueObjectContainer valueObjectContainer =
-                                (ValueObjectContainer) container.getValue(overriding).orElseThrow(
+                                (ValueObjectContainer) container.getValueObject(overriding).orElseThrow(
                                         () -> overridingFunctionOfNonexistentValueObject("getter", method, overriding));
 
                         if(valueObjectContainer.getter instanceof ValueObjectContainer.RedirectedGetter)
@@ -360,7 +362,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
                         String overriding = override.value();
 
                         ValueObjectContainer valueObjectContainer =
-                                (ValueObjectContainer) container.getValue(overriding).orElseThrow(
+                                (ValueObjectContainer) container.getValueObject(overriding).orElseThrow(
                                         () -> overridingFunctionOfNonexistentValueObject("getter", method, overriding));
 
                         if(valueObjectContainer.setter instanceof ValueObjectContainer.RedirectedSetter)
@@ -368,7 +370,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
                                 throw duplicatedOverrideFunction("setter", method, overriding);
                     })
                     .orElse(() -> {
-                        throw new DataObjectMalformationException("Duplicated method metadata");
+                        throw new DataObjectMalformationException("Duplicated method metadata of " + method.toGenericString());
                     });
         }
     }
@@ -377,7 +379,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
     {
        return new DataObjectMalformationException(
                 String.format("Overriding %s of a non-existent value object " +
-                                "(Method: %s," +
+                                "(Method: %s, " +
                                 "Overriding: %s)",
                         function,
                         method.toGenericString(),
