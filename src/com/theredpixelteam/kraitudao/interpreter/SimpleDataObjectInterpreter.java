@@ -79,7 +79,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
     {
         MultipleDataObjectContainer container = new MultipleDataObjectContainer(type);
 
-        parse(type, container);
+        parse(type, container, type.getAnnotation(Inheritance.class) != null, true);
 
         return container;
     }
@@ -88,25 +88,30 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
     {
         UniqueDataObjectContainer container = new UniqueDataObjectContainer(type);
 
-        parse(type, container);
+        parse(type, container, type.getAnnotation(Inheritance.class) != null, true);
 
         return container;
     }
 
-    private void parse(Class<?> type, DataObjectContainer container) throws DataObjectInterpretationException
+    private void parse(Class<?> type, DataObjectContainer container, boolean inherited, boolean top) throws DataObjectInterpretationException
     {
         GlobalExpandRules globalRules = new GlobalExpandRules();
 
         try {
-            parseClass(type, container, globalRules);
-            parseFields(type, container, globalRules);
-            parseMethods(type, container);
+            if(inherited)
+                parse(type.getSuperclass(), container, type.getSuperclass().getAnnotation(Inheritance.class) != null, false);
+
+            parseClass(type, container, globalRules, inherited, top);
+            parseFields(type, container, globalRules, inherited, top);
+            parseMethods(type, container, inherited, top);
         } catch (Exception e) {
             throw new DataObjectInterpretationException(e);
         }
     }
 
-    private void parseClass(Class<?> type, DataObjectContainer container, GlobalExpandRules globalRules)
+
+
+    private void parseClass(Class<?> type, DataObjectContainer container, GlobalExpandRules globalRules, boolean inherited, boolean top)
     {
         for(BuiltinExpandRule builtinRule : type.getAnnotationsByType(BuiltinExpandRule.class))
         {
@@ -154,7 +159,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
         }
     }
 
-    private void parseFields(Class<?> type, DataObjectContainer container, GlobalExpandRules golbalRules)
+    private void parseFields(Class<?> type, DataObjectContainer container, GlobalExpandRules golbalRules, boolean inherited, boolean top)
     {
         for(Field field : type.getDeclaredFields())
         {
@@ -168,7 +173,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
             );
 
             Reference<KeyType> keyType = new Reference<>();
-            ValueObjectContainer valueObject = new ValueObjectContainer(container.getType(), field.getType(), COMPATIBLE_TYPES.get(field.getType()));
+            ValueObjectContainer valueObject = new ValueObjectContainer(container.getType(), field.getType(), REFLECTION_COMPATIBLE_TYPES.get(field.getType()));
             valueObject.owner = container;
 
             Value valueInfo;
@@ -244,7 +249,8 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
                 valueObject.expandRule = expandRuleContainer;
             }
 
-            valueObject.seal();
+            if(top)
+                valueObject.seal();
 
             if(valueObject.isKey())
                 container.putKey(keyType.get(), valueObject);
@@ -278,7 +284,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
             );
     }
 
-    private void parseMethods(Class<?> type, DataObjectContainer container)
+    private void parseMethods(Class<?> type, DataObjectContainer container, boolean inherited, boolean top)
     {
         for(Method method : type.getDeclaredMethods())
         {
@@ -309,7 +315,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
                                     "Declared: " + method.getReturnType().getCanonicalName() + ", " +
                                     "Expected: " + valueObjectContainer.getType().getCanonicalName() + ")");
 
-                        if(valueObjectContainer.getter instanceof ValueObjectContainer.RedirectedGetter) // check duplication
+                        if(!inherited && valueObjectContainer.getter instanceof ValueObjectContainer.RedirectedGetter) // check duplication
                             throw new DataObjectMalformationException("Duplicated getter (Name: " + name + ")");
 
                         if(Modifier.isStatic(modifier)) // static getter
@@ -354,7 +360,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
                                 (ValueObjectContainer) container.getValue(name).orElseThrow(
                                         () -> new DataObjectMalformationException("Invalid setter: No such value object \"" + name + "\""));
 
-                        if(valueObjectContainer.setter instanceof ValueObjectContainer.RedirectedSetter)
+                        if(!inherited && valueObjectContainer.setter instanceof ValueObjectContainer.RedirectedSetter) // check duplication
                             throw new DataObjectMalformationException("Duplicated setter (Name: " + name + ")");
 
                         if(Modifier.isStatic(modifier)) // static setter
@@ -946,7 +952,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
         SECONDARY
     }
 
-    private static final Map<Class<?>, Class<?>> COMPATIBLE_TYPES = new HashMap<Class<?>, Class<?>>()
+    private static final Map<Class<?>, Class<?>> REFLECTION_COMPATIBLE_TYPES = new HashMap<Class<?>, Class<?>>()
     {
         {
             put(boolean.class, Boolean.class);
