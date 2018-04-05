@@ -2,6 +2,7 @@ package com.theredpixelteam.kraitudao.interpreter;
 
 import com.theredpixelteam.kraitudao.annotations.*;
 import com.theredpixelteam.kraitudao.annotations.expandable.*;
+import com.theredpixelteam.kraitudao.annotations.inheritance.*;
 import com.theredpixelteam.kraitudao.dataobject.*;
 import com.theredpixelteam.redtea.predication.MultiCondition;
 import com.theredpixelteam.redtea.predication.MultiPredicate;
@@ -293,13 +294,16 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
             current = annotationCondition.apply(
                     method,
                     Setter.class,
-                    Getter.class
+                    Getter.class,
+                    InheritedSetter.class,
+                    InheritedGetter.class
             );
 
             if(current.getCurrent().trueCount() == 0)
                 continue;
 
-            current.completelyOnlyIf(Getter.class)
+            current
+                    .completelyOnlyIf(Getter.class)
                     .perform(() -> {
                         Getter getter = method.getAnnotation(Getter.class);
                         int modifier = method.getModifiers();
@@ -309,46 +313,10 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
                                 (ValueObjectContainer) container.getValueObject(name).orElseThrow(
                                         () -> new DataObjectMalformationException("Invalid getter: No such value object \"" + name + "\""));
 
-                        if(!valueObjectContainer.getType().equals(method.getReturnType()))
-                            throw new DataObjectMalformationException("Invalid getter return type " +
-                                    "(Name: " + name + ", " +
-                                    "Declared: " + method.getReturnType().getCanonicalName() + ", " +
-                                    "Expected: " + valueObjectContainer.getType().getCanonicalName() + ")");
-
-                        if(!inherited && valueObjectContainer.getter instanceof ValueObjectContainer.RedirectedGetter) // check duplication
+                        if(valueObjectContainer.getter instanceof ValueObjectContainer.RedirectedGetter) // check duplication
                             throw new DataObjectMalformationException("Duplicated getter (Name: " + name + ")");
 
-                        if(Modifier.isStatic(modifier)) // static getter
-                        {
-                            Class<?>[] arguments = method.getParameterTypes();
-
-                            checkArgumentCount(arguments, 1, "Static Getter", name);
-
-                            checkArgument(arguments, 0, type, "Static Getter", name);
-
-                            method.setAccessible(true);
-                            valueObjectContainer.getter = (ValueObjectContainer.RedirectedGetter) (obj) -> {
-                                try {
-                                    return method.invoke(null, obj);
-                                } catch (Exception e) {
-                                    throw new DataObjectError("Reflection error", e);
-                                }
-                            };
-                        }
-                        else // non-static getter
-                        {
-                            if(method.getParameterCount() != 0)
-                                throw new DataObjectMalformationException("Non-static getter should not have any argument (Name: " + name + ")");
-
-                            method.setAccessible(true);
-                            valueObjectContainer.getter = (ValueObjectContainer.RedirectedGetter) (obj) -> {
-                                try {
-                                    return method.invoke(obj);
-                                } catch (Exception e) {
-                                    throw new DataObjectError("Reflection error", e);
-                                }
-                            };
-                        }
+                        checkAndRedirectGetter(valueObjectContainer, type, method, name);
                     })
                     .elseCompletelyOnlyIf(Setter.class)
                     .perform(() -> {
@@ -360,48 +328,163 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
                                 (ValueObjectContainer) container.getValue(name).orElseThrow(
                                         () -> new DataObjectMalformationException("Invalid setter: No such value object \"" + name + "\""));
 
-                        if(!inherited && valueObjectContainer.setter instanceof ValueObjectContainer.RedirectedSetter) // check duplication
+                        if(valueObjectContainer.setter instanceof ValueObjectContainer.RedirectedSetter) // check duplication
                             throw new DataObjectMalformationException("Duplicated setter (Name: " + name + ")");
 
-                        if(Modifier.isStatic(modifier)) // static setter
-                        {
-                            Class<?>[] arguments = method.getParameterTypes();
+                        checkAndRedirectSetter(valueObjectContainer, type, method, name);
+                    })
+                    .elseCompletelyOnlyIf(OverrideGetter.class)
+                    .perform(() -> {
+                        if(!inherited)
+                            throw new DataObjectMalformationException("Using @OverrideGetter without @Inheritance");
 
-                            checkArgumentCount(arguments, 2, "Static Setter", name);
+                        OverrideGetter override = method.getAnnotation(OverrideGetter.class);
+                        String overriding = override.value();
 
-                            checkArgument(arguments, 0, type, "Static Setter", name);
-                            checkArgument(arguments, 1, valueObjectContainer.getType(), "Static setter", name);
+                        ValueObjectContainer valueObjectContainer =
+                                (ValueObjectContainer) container.getValue(overriding).orElseThrow(
+                                        () -> overridingFunctionOfNonexistentValueObject("getter", method, overriding));
 
-                            method.setAccessible(true);
-                            valueObjectContainer.setter = (ValueObjectContainer.RedirectedSetter) (obj, val) -> {
-                                try {
-                                    method.invoke(null, obj, val);
-                                } catch (Exception e) {
-                                    throw new DataObjectError("Reflection error", e);
-                                }
-                            };
-                        }
-                        else // non-static setter
-                        {
-                            Class<?>[] arguments = method.getParameterTypes();
+                        if(valueObjectContainer.getter instanceof ValueObjectContainer.RedirectedGetter)
+                            if(((ValueObjectContainer.RedirectedGetter) valueObjectContainer.getter).source().equals(type)) // check duplication
+                                throw duplicatedOverrideFunction("getter", method, overriding);
 
-                            checkArgumentCount(arguments, 1, "Non-static Setter", name);
+                        checkAndRedirectGetter(valueObjectContainer, type, method, overriding);
+                    })
+                    .elseCompletelyOnlyIf(OverrideSetter.class)
+                    .perform(() -> {
+                        if(!inherited)
+                            throw new DataObjectMalformationException("Using @OverrideSetter without @Inheritance");
 
-                            checkArgument(arguments, 0, valueObjectContainer.getType(), "Non-static Setter", name);
+                        OverrideSetter override = method.getAnnotation(OverrideSetter.class);
+                        String overriding = override.value();
 
-                            method.setAccessible(true);
-                            valueObjectContainer.setter = (ValueObjectContainer.RedirectedSetter) (obj, val) -> {
-                                try {
-                                    method.invoke(obj, val);
-                                } catch (Exception e) {
-                                    throw new DataObjectError("Reflection error", e);
-                                }
-                            };
-                        }
+                        ValueObjectContainer valueObjectContainer =
+                                (ValueObjectContainer) container.getValue(overriding).orElseThrow(
+                                        () -> overridingFunctionOfNonexistentValueObject("getter", method, overriding));
+
+                        if(valueObjectContainer.setter instanceof ValueObjectContainer.RedirectedSetter)
+                            if(((ValueObjectContainer.RedirectedSetter) valueObjectContainer.setter).source().equals(type)) // check duplication
+                                throw duplicatedOverrideFunction("setter", method, overriding);
                     })
                     .orElse(() -> {
                         throw new DataObjectMalformationException("Duplicated method metadata");
                     });
+        }
+    }
+
+    private DataObjectMalformationException overridingFunctionOfNonexistentValueObject(String function, Method method, String overriding)
+    {
+       return new DataObjectMalformationException(
+                String.format("Overriding %s of a non-existent value object " +
+                                "(Method: %s," +
+                                "Overriding: %s)",
+                        function,
+                        method.toGenericString(),
+                        overriding));
+    }
+
+    private DataObjectMalformationException duplicatedOverrideFunction(String function, Method method, String overriding)
+    {
+        return new DataObjectMalformationException(
+                String.format("Duplicated %s " +
+                                "(Overriding: %s, " +
+                                "Type: %s)",
+                        function,
+                        overriding,
+                        method.getDeclaringClass().getCanonicalName())
+        );
+    }
+
+    private static void checkAndRedirectSetter(ValueObjectContainer valueObjectContainer, Class<?> type, Method method, String name)
+    {
+        int modifier = method.getModifiers();
+
+        if(Modifier.isStatic(modifier)) // static setter
+        {
+            Class<?>[] arguments = method.getParameterTypes();
+
+            checkArgumentCount(arguments, 2, "Static Setter", name);
+
+            checkArgument(arguments, 0, type, "Static Setter", name);
+            checkArgument(arguments, 1, valueObjectContainer.getType(), "Static setter", name);
+
+            method.setAccessible(true);
+            valueObjectContainer.setter = new ValueObjectContainer.RedirectedSetterContainer(type,
+                    (obj, val) -> {
+                        try {
+                            method.invoke(null, obj, val);
+                        } catch (Exception e) {
+                            throw new DataObjectError("Reflection error", e);
+                        }
+                    }
+            );
+        }
+        else // non-static setter
+        {
+            Class<?>[] arguments = method.getParameterTypes();
+
+            checkArgumentCount(arguments, 1, "Non-static Setter", name);
+
+            checkArgument(arguments, 0, valueObjectContainer.getType(), "Non-static Setter", name);
+
+            method.setAccessible(true);
+            valueObjectContainer.setter = new ValueObjectContainer.RedirectedSetterContainer(type,
+                    (obj, val) -> {
+                        try {
+                            method.invoke(obj, val);
+                        } catch (Exception e) {
+                            throw new DataObjectError("Reflection error", e);
+                        }
+                    }
+            );
+        }
+    }
+
+    private static void checkAndRedirectGetter(ValueObjectContainer valueObjectContainer, Class<?> type, Method method, String name)
+    {
+        int modifier = method.getModifiers();
+
+        if(!valueObjectContainer.getType().equals(method.getReturnType()))
+            throw new DataObjectMalformationException("Invalid getter return type " +
+                    "(Name: " + name + ", " +
+                    "Declared: " + method.getReturnType().getCanonicalName() + ", " +
+                    "Expected: " + valueObjectContainer.getType().getCanonicalName() + ")");
+
+        if(Modifier.isStatic(modifier)) // static getter
+        {
+            Class<?>[] arguments = method.getParameterTypes();
+
+            checkArgumentCount(arguments, 1, "Static Getter", name);
+
+            checkArgument(arguments, 0, type, "Static Getter", name);
+
+            method.setAccessible(true);
+            valueObjectContainer.getter = new ValueObjectContainer.RedirectedGetterContainer(type,
+                    (obj) -> {
+                        try {
+                            return method.invoke(null, obj);
+                        } catch (Exception e) {
+                            throw new DataObjectError("Reflection error", e);
+                        }
+                    }
+            );
+        }
+        else // non-static getter
+        {
+            if(method.getParameterCount() != 0)
+                throw new DataObjectMalformationException("Non-static getter should not have any argument (Name: " + name + ")");
+
+            method.setAccessible(true);
+            valueObjectContainer.getter = new ValueObjectContainer.RedirectedGetterContainer(type,
+                    (obj) -> {
+                        try {
+                            return method.invoke(obj);
+                        } catch (Exception e) {
+                            throw new DataObjectError("Reflection error", e);
+                        }
+                    }
+            );
         }
     }
 
@@ -423,9 +506,17 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
                     .next(a(Getter.class))
                     .next(a(Setter.class))
                     .next(a(Inheritance.class))
+                    .next(a(InheritedGetter.class))
+                    .next(a(InheritedSetter.class))
 //                  .next(a(BuiltinExpandRule.class))
 //                  .next(a(CustomExpandRule.class))
 //                  .next(a(Expandable.class))
+                    .next(a(InheritValue.class))
+                    .next(a(InheritKey.class))
+                    .next(a(InheritPrimaryKey.class))
+                    .next(a(InheritSecondaryKey.class))
+                    .next(a(OverrideGetter.class))
+                    .next(a(OverrideSetter.class))
             .build());
 
     private static interface DataObjectContainer extends DataObject
@@ -811,7 +902,7 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
             Object get(Object object);
         }
 
-        private static interface RedirectedGetter extends Getter
+        private static interface RedirectedGetter extends Getter, RedirectedElement
         {
         }
 
@@ -820,8 +911,63 @@ public class SimpleDataObjectInterpreter implements DataObjectInterpreter {
             void set(Object object, Object value);
         }
 
-        private static interface RedirectedSetter extends Setter
+        private static interface RedirectedSetter extends Setter, RedirectedElement
         {
+        }
+
+        private static interface RedirectedElement
+        {
+            Class<?> source();
+        }
+
+        private static class RedirectedGetterContainer implements RedirectedGetter, RedirectedElement
+        {
+            RedirectedGetterContainer(Class<?> source, Getter getter)
+            {
+                this.source = source;
+                this.getter = getter;
+            }
+
+            @Override
+            public Object get(Object object)
+            {
+                return this.getter.get(object);
+            }
+
+            @Override
+            public Class<?> source()
+            {
+                return this.source;
+            }
+
+            private final Class<?> source;
+
+            private final Getter getter;
+        }
+
+        private static class RedirectedSetterContainer implements RedirectedSetter, RedirectedElement
+        {
+            RedirectedSetterContainer(Class<?> source, Setter setter)
+            {
+                this.source = source;
+                this.setter = setter;
+            }
+
+            @Override
+            public void set(Object object, Object value)
+            {
+                this.setter.set(object, value);
+            }
+
+            @Override
+            public Class<?> source()
+            {
+                return this.source;
+            }
+
+            private final Class<?> source;
+
+            private final Setter setter;
         }
     }
 

@@ -1,4 +1,4 @@
-package com.theredpixelteam.kraitudao.annotations;
+package com.theredpixelteam.kraitudao.annotations.inheritance;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
