@@ -150,4 +150,39 @@ public class Example {
 
 ## 数据对象类继承
 
+对于数据对象类，我们允许继承关系的存在，并且我们相信因此数据对象类的设计与操作会更加灵活。为了保证最少的误操作可能性，我们对继承的声明进行了严格的规定，大部分继承关系都需要注解声明。  
+假设我们有一个唯一数据对象类，如下（可重复数据对象类的规定与下文的说明都相同，并且下文的说明都将基于这个例子）：
+```Java
+@Unique
+public class House {
+    @Key
+    private int Lady;
+    
+    @Value
+    private int Tom;
+    
+    private int Jerry;
+}
+```
+你可能发现我们的小老鼠**Jerry**没有被标注为值对象，不要着急！下文它会发挥它的作用。  
+有一天，**Tom**决定今天一定要抓住**Jerry**，趁**Jerry**不在家，**Tom**叫来了他的好朋友**Butch**，这时候家里便多了一只猫**Butch**。这时候我们不需要对我们的房子大动干戈，要表示多了一只猫的情况，我们只需要继承```House```即可，就像这样：
+```Java
+@Inheritance // 不要忘记这个！
+@Unique
+public class HouseWith2Cats extends House {
+    @Value
+    public int Butch;
+}
+```
+这时候我们的数据对象里就包含了```Tom```和```Butch```两个值对象了。  
+这个时候**Jerry**回来了，但是**Jerry**在这个房子里的地位是毫无疑问的，不需要重新声明，只需要像这样即可：
+```Java
+@Inheritance // 千万不要忘记这个！
+@Unique
+@InheriteValue(field = "Jerry" /*, name = "foo" */) // 你要是想的话，也可以给Jerry改个名字
+public class HouseWith2CatsAnd1Mouse extends HouseWith2Cats {
+    // 不需要其它操作
+}
+```
+
 未完待续
