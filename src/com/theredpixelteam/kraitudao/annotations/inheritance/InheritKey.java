@@ -11,4 +11,8 @@ public @interface InheritKey {
     public String field();
 
     public String name() default "";
+
+    public Class<?> source() default Void.class;
+
+    public boolean strict() default false;
 }
