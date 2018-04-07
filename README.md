@@ -164,6 +164,7 @@ public class House {
     private int Jerry;
 }
 ```
+
 你可能发现我们的小老鼠**Jerry**没有被标注为值对象，不要着急！下文它会发挥它的作用。  
 有一天，**Tom**决定今天一定要抓住**Jerry**，趁**Jerry**不在家，**Tom**叫来了他的好朋友**Butch**，这时候家里便多了一只猫**Butch**。这时候我们不需要对我们的房子大动干戈，要表示多了一只猫的情况，我们只需要继承```House```即可，就像这样：
 ```Java
@@ -174,6 +175,7 @@ public class HouseWith2Cats extends House {
     public int Butch;
 }
 ```
+
 这时候我们的数据对象里就包含了```Tom```和```Butch```两个值对象了。  
 这个时候**Jerry**回来了，但是**Jerry**在这个房子里的地位是毫无疑问的，不需要重新声明，只需要像这样即可：
 ```Java
@@ -182,6 +184,71 @@ public class HouseWith2Cats extends House {
 @InheriteValue(field = "Jerry" /*, name = "foo" */) // 你要是想的话，也可以给Jerry改个名字
 public class HouseWith2CatsAnd1Mouse extends HouseWith2Cats {
     // 不需要其它操作
+}
+```
+
+此时我们的数据对象里就包含了```Tom```,```Butch```和```Jerry```三个值对象了。  
+**注意：使用```@InheriteValue```,```@InheriteKey```,```@InheritePrimaryKey```,```@InheriteSecondaryKey```时，对于继承的域的扫描方式，使用标准注解解析规则(```StandardDataObjectInterpreter```)时，规定如果存在继承关系，且没有使用其他参数，则从当前类向超类扫描，找到第一个符合名称的域为止。若没有找到，则会抛出解析错误。**
+
+### 附加参数
+
+* **```source``` 用来指定域所在的类，若该类不存在此域，或此类不在继承关系中，则抛出解析错误。**  
+例如：
+```Java
+public class ExampleA {
+    private int value;
+}
+
+public class ExampleB extends ExampleA {
+    private int value;
+}
+
+@Unique
+@InheriteValue(field = "value", source = ExampleA.class)
+public class Example extends ExampleB {
+    @Key
+    private int key;
+}
+```
+如果我们置```source = ExampleA.class```，则继承的值域为```ExampleA```中的```value```，否则由于自下向上扫描的机制，继承的值域为```ExampleB```中的```value```。而若```ExampleA```中不存在```value```域，则会抛出解析错误。
+
+* **```strict``` 如果置```strict = true```则会严格检查继承关系中的```@Inheritance```注解，反之不严格检查。**  
+例如如下继承关系：
+```Java
+public class ExampleBase {
+    private int value;
+}
+
+@Unique
+@InheriteValue(field = "value" /*, strict = false*/)
+public class Example extends ExampleBase {
+    // ...
+}
+```
+在这种情况下，如果我们置```strict = true```：
+```Java
+@Unique
+@InheriteValue(field = "value", strict = true)
+public class Example extends Example Base {
+    // ...
+}
+```
+则会抛出解析错误，由于域```value```存在于父类```ExampleBase```中，但```Exmaple```并没有使用```@Inheritance```进行标注，并且父类并不是一个标准的数据对象类。简言之，在```strict = true```时，如果扫描域时，正在扫描的类没有被```@Inheritance```注解，则扫描过程会在当前被扫描的类停止，若```strict = false```（默认）则会继续扫描。  
+以下示例中就不会因此抛出解析错误：
+```Java
+@Unique
+public class ExampleA {
+    @Key
+    private int key;
+    
+    private int value;
+}
+
+@Unique
+@Inheritance
+@InheriteValue(field = "value", strict = true)
+public class Example {
+    // ...
 }
 ```
 
