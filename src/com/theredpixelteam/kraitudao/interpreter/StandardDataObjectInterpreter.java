@@ -287,11 +287,99 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             );
     }
 
+    private static <T extends Annotation> T search(Class<?> type, String name, Class<?>[] arguments, Class<T> anno)
+    {
+        Class<?> superClass = type.getSuperclass();
+
+        if(superClass == null)
+            return null;
+
+       while(!superClass.equals(Objects.class))
+       {
+           try {
+               Method mthd = superClass.getDeclaredMethod(name, arguments);
+
+               T annotation;
+               if((annotation = mthd.getAnnotation(anno)) != null)
+                   return annotation;
+           } catch (NoSuchMethodException e) {
+           }
+
+           superClass = superClass.getSuperclass();
+       }
+
+        return null;
+    }
+
+    private static DataObjectMalformationException notInherited(String inheritance,
+                                                                String annotation,
+                                                                Class<?> type,
+                                                                Method method)
+    {
+        return new DataObjectMalformationException(
+                String.format("Not inherited from any %s but found %s (Class: %s, Method: %s)",
+                        inheritance,
+                        annotation,
+                        type.getCanonicalName(),
+                        method.toGenericString()));
+    }
+
+    private static DataObjectMalformationException incompatibleInheritance(String inheritance,
+                                                                           String annotated,
+                                                                           String current,
+                                                                           Class<?> type,
+                                                                           Method method)
+    {
+        return new DataObjectMalformationException(
+                String.format("Incompatible %s inheritance (Class: %s, Method: %s, Annotated: %s, Current: %s)",
+                        inheritance,
+                        type.getCanonicalName(),
+                        method.toGenericString(),
+                        annotated,
+                        current)
+        );
+    }
+
     private void parseMethods(Class<?> type, DataObjectContainer container, boolean inherited, boolean top)
     {
         for(Method method : type.getDeclaredMethods())
         {
             MultiCondition.CurrentCondition<Class<?>> current;
+
+            // annotations for checking
+            current = annotationCondition.apply(
+                    method,
+                    InheritedGetter.class,
+                    InheritedSetter.class
+            );
+
+            if(current.getCurrent().trueCount() != 0)
+                current
+                        .completelyOnlyIf(InheritedGetter.class)
+                        .perform(() -> {
+                            InheritedGetter inheritance = method.getAnnotation(InheritedGetter.class);
+                            Getter getterInfo = search(type, method.getName(), method.getParameterTypes(), Getter.class);
+
+                            if(getterInfo == null)
+                                throw notInherited("getter", "@InheritedGetter", type, method);
+
+                            if(!inheritance.value().isEmpty() && !inheritance.value().equals(getterInfo.value()))
+                                throw incompatibleInheritance("getter", inheritance.value(), getterInfo.value(), type, method);
+                        })
+                        .completelyOnlyIf(InheritedSetter.class)
+                        .perform(() -> {
+                            InheritedSetter inheritance = method.getAnnotation(InheritedSetter.class);
+                            Setter getterInfo = search(type, method.getName(), method.getParameterTypes(), Setter.class);
+
+                            if(getterInfo == null)
+                                throw notInherited("setter", "@InheritedSetter", type, method);
+
+                            if(!inheritance.value().isEmpty() && !inheritance.value().equals(getterInfo.value()))
+                                throw incompatibleInheritance("setter", inheritance.value(), getterInfo.value(), type, method);
+                        })
+                        .orElse(() -> {
+                            throw new DataObjectMalformationException("Duplicated metadata (Method: " + method.toGenericString() + ") @InheritedGetter & @InheritedSetter");
+                        });
 
             current = annotationCondition.apply(
                     method,
