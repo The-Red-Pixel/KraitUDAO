@@ -294,7 +294,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         if(superClass == null)
             return null;
 
-       while(!superClass.equals(Objects.class))
+       while(!superClass.equals(Object.class))
        {
            try {
                Method mthd = superClass.getDeclaredMethod(name, arguments);
@@ -366,7 +366,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
                             if(!inheritance.value().isEmpty() && !inheritance.value().equals(getterInfo.value()))
                                 throw incompatibleInheritance("getter", inheritance.value(), getterInfo.value(), type, method);
                         })
-                        .completelyOnlyIf(InheritedSetter.class)
+                        .elseCompletelyOnlyIf(InheritedSetter.class)
                         .perform(() -> {
                             InheritedSetter inheritance = method.getAnnotation(InheritedSetter.class);
                             Setter getterInfo = search(type, method.getName(), method.getParameterTypes(), Setter.class);
