@@ -112,8 +112,6 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         }
     }
 
-
-
     private void parseClass(Class<?> type, DataObjectContainer container, GlobalExpandRules globalRules, boolean inherited, boolean top)
     {
         for(BuiltinExpandRule builtinRule : type.getAnnotationsByType(BuiltinExpandRule.class))
@@ -142,6 +140,78 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             parseExpandRuleEntries(expandRuleContainer, customRule.entries());
 
             globalRules.put(expanding, expandRuleContainer);
+        }
+
+        for(InheritValue inheritValue : type.getAnnotationsByType(InheritValue.class))
+        {
+            InheritanceInfo iif = new InheritanceInfo(inheritValue);
+        }
+    }
+
+    private static Field search(Class<?> type, InheritanceInfo info)
+    {
+        if(info.strict() && (type.getAnnotation(Inheritance.class)) == null)
+        {
+            if(info.source().equals(Void.class) || info.source().equals(type))
+                try {
+                    return type.getDeclaredField(info.name());
+                } catch (NoSuchFieldException e) {
+                }
+
+            throw new DataObjectMalformationException(String.format(
+                    "Field \"%s\" not found",
+                    info.field()
+            ));
+        }
+
+        Class<?> klass = type.getSuperclass();
+        Class<?> c = type;
+
+        if(!info.source().equals(Void.class))
+        {
+            while(!c.equals(Object.class))
+            {
+                if (c.equals(info.source()))
+                    try {
+                        return c.getDeclaredField(info.field());
+                    } catch (NoSuchFieldException e) {
+                        throw new DataObjectMalformationException(String.format(
+                                "Field \"%s\" not found in source class: %s",
+                                info.field(),
+                                c.getCanonicalName()), e
+                        );
+                    }
+
+                if(info.strict() && c.getAnnotation(Inheritance.class) == null)
+                    break;
+
+                c = c.getSuperclass();
+            }
+
+            throw new DataObjectMalformationException(String.format(
+                    "Source class \"%s\" is not in the inhertiance tree",
+                    info.source().getCanonicalName()
+            ));
+        }
+        else
+        {
+            while(!c.equals(Object.class))
+            {
+                try {
+                    return c.getDeclaredField(info.field());
+                } catch (NoSuchFieldException e) {
+                }
+
+                if(info.strict() && c.getAnnotation(Inheritance.class) == null)
+                    break;
+
+                c = c.getSuperclass();
+            }
+
+            throw new DataObjectMalformationException(String.format(
+                    "Field \"%s\" not found in inheritance tree",
+                    info.field()
+            ));
         }
     }
 
@@ -1179,6 +1249,102 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
 
             final Source source;
         }
+    }
+
+    private static class InheritanceInfo
+    {
+        InheritanceInfo(InheritValue info)
+        {
+            this.name = info.name();
+            this.field = info.field();
+            this.source = info.source();
+            this.strict = info.strict();
+            this.genericString = toGenericString("@InheritValue", this);
+        }
+
+
+        InheritanceInfo(InheritKey info)
+        {
+            this.name = info.name();
+            this.field = info.field();
+            this.source = info.source();
+            this.strict = info.strict();
+            this.genericString = toGenericString("@InheritKey", this);
+        }
+
+        InheritanceInfo(InheritPrimaryKey info)
+        {
+            this.name = info.name();
+            this.field = info.field();
+            this.source = info.source();
+            this.strict = info.strict();
+            this.genericString = toGenericString("@InheritPrimaryKey", this);
+        }
+
+        InheritanceInfo(InheritSecondaryKey info)
+        {
+            this.name = info.name();
+            this.field = info.field();
+            this.source = info.source();
+            this.strict = info.strict();
+            this.genericString = toGenericString("@InheritSecondaryKey", this);
+        }
+
+        private static String toGenericString(String tag, InheritanceInfo info)
+        {
+            StringBuilder sb = new StringBuilder(tag);
+
+            sb.append("(").append("field = \"").append(info.field()).append("\"");
+
+            if(!info.name().isEmpty())
+                sb.append(", name = \"").append(info.name()).append("\"");
+
+            if(!info.source().equals(Void.class))
+                sb.append(", source = ").append(info.source().getCanonicalName()).append(".class");
+
+            if(info.strict())
+                sb.append(", strict = true");
+
+            sb.append(")");
+
+            return sb.toString();
+        }
+
+        String name()
+        {
+            return this.name;
+        }
+
+        String field()
+        {
+            return this.field;
+        }
+
+        Class<?> source()
+        {
+            return this.source;
+        }
+
+        boolean strict()
+        {
+            return this.strict;
+        }
+
+        @Override
+        public String toString()
+        {
+            return genericString;
+        }
+
+        private final String genericString;
+
+        private final String name;
+
+        private final String field;
+
+        private final Class<?> source;
+
+        private final boolean strict;
     }
 
     private static enum KeyType
