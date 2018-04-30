@@ -1,5 +1,6 @@
 package com.theredpixelteam.kraitudao.interpreter;
 
+import com.theredpixelteam.kraitudao.PlaceHolder;
 import com.theredpixelteam.kraitudao.annotations.*;
 import com.theredpixelteam.kraitudao.annotations.expandable.*;
 import com.theredpixelteam.kraitudao.annotations.inheritance.*;
@@ -145,6 +146,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         for(InheritValue inheritValue : type.getAnnotationsByType(InheritValue.class))
         {
             InheritanceInfo iif = new InheritanceInfo(inheritValue);
+
         }
     }
 
@@ -152,7 +154,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
     {
         if(info.strict() && (type.getAnnotation(Inheritance.class)) == null)
         {
-            if(info.source().equals(Void.class) || info.source().equals(type))
+            if(info.source().equals(PlaceHolder.class) || info.source().equals(type))
                 try {
                     return type.getDeclaredField(info.name());
                 } catch (NoSuchFieldException e) {
@@ -167,7 +169,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         Class<?> klass = type.getSuperclass();
         Class<?> c = type;
 
-        if(!info.source().equals(Void.class))
+        if(!info.source().equals(PlaceHolder.class))
         {
             while(!c.equals(Object.class))
             {
@@ -1299,7 +1301,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             if(!info.name().isEmpty())
                 sb.append(", name = \"").append(info.name()).append("\"");
 
-            if(!info.source().equals(Void.class))
+            if(!info.source().equals(PlaceHolder.class))
                 sb.append(", source = ").append(info.source().getCanonicalName()).append(".class");
 
             if(info.strict())
