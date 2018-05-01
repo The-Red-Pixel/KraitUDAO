@@ -150,6 +150,20 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         }
     }
 
+    private static Field searchAndCheck(Class<?> type, InheritanceInfo info)
+    {
+        Field f = search(type, info);
+
+        if(!info.type().equals(PlaceHolder.class) && !info.type().equals(f.getType()))
+            throw new DataObjectMalformationException(String.format(
+                    "Incompatible field type: %s (Required: %s)",
+                    f.getType().getCanonicalName(),
+                    info.type().getCanonicalName())
+            );
+
+        return f;
+    }
+
     private static Field search(Class<?> type, InheritanceInfo info)
     {
         if(info.strict() && (type.getAnnotation(Inheritance.class)) == null)
@@ -1260,7 +1274,9 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             this.name = info.name();
             this.field = info.field();
             this.source = info.source();
+            this.type = info.type();
             this.strict = info.strict();
+            this.expanding = info.expanding();
             this.genericString = toGenericString("@InheritValue", this);
         }
 
@@ -1270,7 +1286,9 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             this.name = info.name();
             this.field = info.field();
             this.source = info.source();
+            this.type = info.type();
             this.strict = info.strict();
+            this.expanding = info.expanding();
             this.genericString = toGenericString("@InheritKey", this);
         }
 
@@ -1279,7 +1297,9 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             this.name = info.name();
             this.field = info.field();
             this.source = info.source();
+            this.type = info.type();
             this.strict = info.strict();
+            this.expanding = info.expanding();
             this.genericString = toGenericString("@InheritPrimaryKey", this);
         }
 
@@ -1288,7 +1308,9 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             this.name = info.name();
             this.field = info.field();
             this.source = info.source();
+            this.type = info.type();
             this.strict = info.strict();
+            this.expanding = info.expanding();
             this.genericString = toGenericString("@InheritSecondaryKey", this);
         }
 
@@ -1304,8 +1326,14 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             if(!info.source().equals(PlaceHolder.class))
                 sb.append(", source = ").append(info.source().getCanonicalName()).append(".class");
 
+            if(!info.type().equals(PlaceHolder.class))
+                sb.append(", type = ").append(info.type().getCanonicalName()).append(".class");
+
             if(info.strict())
                 sb.append(", strict = true");
+
+            if(info.expanding().entries().length != 0)
+                sb.append(", expanding = @Expandable(...)");
 
             sb.append(")");
 
@@ -1327,9 +1355,19 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             return this.source;
         }
 
+        Class<?> type()
+        {
+            return this.type;
+        }
+
         boolean strict()
         {
             return this.strict;
+        }
+
+        Expandable expanding()
+        {
+            return this.expanding;
         }
 
         @Override
@@ -1346,7 +1384,11 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
 
         private final Class<?> source;
 
+        private final Class<?> type;
+
         private final boolean strict;
+
+        private final Expandable expanding;
     }
 
     private static enum KeyType
