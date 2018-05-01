@@ -145,9 +145,116 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
 
         for(InheritValue inheritValue : type.getAnnotationsByType(InheritValue.class))
         {
-            InheritanceInfo iif = new InheritanceInfo(inheritValue);
+            InheritanceInfo info = new InheritanceInfo(inheritValue);
 
+            try {
+                ValueObjectContainer valueObject = parseValueObject(type, container, info);
+
+                valueObject.seal();
+
+                container.putValue(valueObject);
+            } catch (Exception e) {
+                throw new DataObjectMalformationException(info.toString(), e);
+            }
         }
+
+        for(InheritKey inheritKey : type.getAnnotationsByType(InheritKey.class))
+        {
+            InheritanceInfo info = new InheritanceInfo(inheritKey);
+
+            try {
+                ValueObjectContainer valueObject = parseValueObject(type, container, info);
+
+                valueObject.primaryKey = true;
+                valueObject.seal();
+
+                container.putKey(KeyType.UNIQUE, valueObject);
+            } catch (Exception e) {
+                throw new DataObjectMalformationException(info.toString(), e);
+            }
+        }
+
+        for(InheritPrimaryKey inheritPrimaryKey : type.getAnnotationsByType(InheritPrimaryKey.class))
+        {
+            InheritanceInfo info = new InheritanceInfo(inheritPrimaryKey);
+
+            try {
+                ValueObjectContainer valueObject = parseValueObject(type, container, info);
+
+                valueObject.primaryKey = true;
+                valueObject.seal();
+
+                container.putKey(KeyType.PRIMARY, valueObject);
+            } catch (Exception e) {
+                throw new DataObjectMalformationException(info.toString(), e);
+            }
+        }
+
+        for(InheritSecondaryKey inheritSecondaryKey : type.getAnnotationsByType(InheritSecondaryKey.class))
+        {
+            InheritanceInfo info = new InheritanceInfo(inheritSecondaryKey);
+
+            try {
+                ValueObjectContainer valueObject = parseValueObject(type, container, info);
+
+                valueObject.secondaryKey = true;
+                valueObject.seal();
+
+                container.putKey(KeyType.SECONDARY, valueObject);
+            } catch (Exception e) {
+                throw new DataObjectMalformationException(info.toString(), e);
+            }
+        }
+    }
+
+    private static ValueObjectContainer parseValueObject(Class<?> type, DataObjectContainer container, InheritanceInfo info)
+    {
+        Field f = searchAndCheck(type, info);
+
+        ValueObjectContainer voc = new ValueObjectContainer(type, f.getType(), REFLECTION_COMPATIBLE_TYPES.get(f.getType()));
+        voc.owner = container;
+
+        voc.name = info.name().isEmpty() ? f.getName() : info.name();
+
+        defaultSetterAndGetter(voc, f);
+        parseRules(type, f.getType(), voc, info);
+
+        return voc;
+    }
+
+    private static void parseRules(Class<?> type, Class<?> fieldType, ValueObjectContainer valueObject, InheritanceInfo info)
+    {
+        Entry[] entires = info.expanding().entries();
+
+        if(entires.length == 0)
+            return;
+
+        ExpandRuleContainer expandRule = new ExpandRuleContainer(fieldType);
+
+        parseExpandRuleEntries(expandRule, entires);
+
+        valueObject.expandRule = expandRule;
+    }
+
+    private static void defaultSetterAndGetter(ValueObjectContainer valueObject, Field field)
+    {
+        // getter
+        valueObject.getter = (obj) -> {
+            try {
+                return field.get(obj);
+            } catch (Exception e) {
+                throw new DataObjectError("Reflection error", e);
+            }
+        };
+
+        // setter
+        valueObject.setter = (obj, val) -> {
+            try {
+                field.set(obj, val);
+            } catch (Exception e) {
+                throw new DataObjectError("Reflection error", e);
+            }
+        };
     }
 
     private static Field searchAndCheck(Class<?> type, InheritanceInfo info)
@@ -302,23 +409,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
 
             field.setAccessible(true);
 
-            // getter
-            valueObject.getter = (obj) -> {
-                try {
-                    return field.get(obj);
-                } catch (Exception e) {
-                    throw new DataObjectError("Reflection error", e);
-                }
-            };
-
-            // setter
-            valueObject.setter = (obj, val) -> {
-                try {
-                    field.set(obj, val);
-                } catch (Exception e) {
-                    throw new DataObjectError("Reflection error", e);
-                }
-            };
+            defaultSetterAndGetter(valueObject, field);
 
             // expand rule
             Expandable expandInfo;
