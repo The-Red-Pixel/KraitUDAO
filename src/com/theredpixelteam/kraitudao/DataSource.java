@@ -13,6 +13,8 @@ public interface DataSource {
 
     public <T> Collection<T> pull(Class<T> type) throws DataSourceException;
 
+    public <T> Collection<T> pullVaguely(T object) throws DataSourceException;
+
     public default Transition commit(Collection<Object> objects) throws DataSourceException
     {
         return commit(null, objects);
@@ -26,4 +28,16 @@ public interface DataSource {
     }
 
     public <T> Transition commit(Transition transition, T object, Class<T> type) throws DataSourceException;
+
+    public <T> Transition remove(T object) throws DataSourceException;
+
+    public <T> Transition remove(Transition transition, T object) throws DataSourceException;
+
+    public <T> Transition clear() throws DataSourceException;
+
+    public <T> Transition clear(Transition transition) throws DataSourceException;
+
+    public <T> Transition removeVaguely(T object) throws DataSourceException;
+
+    public <T> Transition removeVaguely(Transition transition, T object) throws DataSourceException;
 }
