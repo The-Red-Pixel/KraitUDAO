@@ -78,10 +78,175 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
     }
 
     @Override
-    public DataObject blur(DataObject dataObject) throws DataObjectInterpretationException
+    public DataObject mergeExpansion(DataObject dataObject) throws DataObjectInterpretationException
     {
-        //  TODO
-        return null;
+        DataObjectContainer dataObjectContainer;
+
+        if(dataObject instanceof MultipleDataObject)
+        {
+            MultipleDataObject multipleDataObject = (MultipleDataObject) dataObject;
+            dataObjectContainer = new MultipleDataObjectContainer(dataObject.getType());
+
+            dataObjectContainer.putKey(KeyType.PRIMARY, multipleDataObject.getPrimaryKey());
+
+            for(ValueObject secondaryKey : multipleDataObject.getSecondaryKeys().values())
+                if(!secondaryKey.getExpandRule().isPresent())
+                    dataObjectContainer.putKey(KeyType.SECONDARY, secondaryKey);
+                else
+                {
+                    ExpandRule expandRule = secondaryKey.getExpandRule().get();
+
+                    for(ExpandRule.Entry entry : expandRule.getEntries())
+                    {
+                        Class<?> type = entry.getExpandedType();
+                        String name = entry.name();
+
+                        ValueObjectContainer valueObjectContainer = new ValueObjectContainer(dataObject.getType(), type, REFLECTION_COMPATIBLE_TYPES.get(type));
+                        valueObjectContainer.name = name;
+                        valueObjectContainer.secondaryKey = true;
+                        valueObjectContainer.owner = dataObject;
+
+                        mergeExpandRules(dataObject, valueObjectContainer, entry);
+
+                        valueObjectContainer.seal();
+
+                        dataObjectContainer.putKey(KeyType.SECONDARY, valueObjectContainer);
+                    }
+                }
+        }
+        else if(dataObject instanceof UniqueDataObject)
+        {
+            UniqueDataObject uniqueDataObject = (UniqueDataObject) dataObject;
+            dataObjectContainer = new UniqueDataObjectContainer(dataObject.getType());
+
+            dataObjectContainer.putKey(KeyType.UNIQUE, uniqueDataObject.getKey());
+        }
+        else
+            throw new DataObjectMalformationException("Illegal type of data object");
+
+        for(ValueObject value : dataObject.getValues().values())
+            if(!value.getExpandRule().isPresent())
+                dataObjectContainer.putValue(value);
+            else
+            {
+                ExpandRule expandRule = value.getExpandRule().get();
+
+                for(ExpandRule.Entry entry : expandRule.getEntries())
+                {
+                    Class<?> type = entry.getExpandedType();
+                    String name = entry.name();
+
+                    ValueObjectContainer valueObjectContainer = new ValueObjectContainer(dataObject.getType(), type, REFLECTION_COMPATIBLE_TYPES.get(type));
+                    valueObjectContainer.name = name;
+                    valueObjectContainer.owner = dataObject;
+
+                    mergeExpandRules(dataObject, valueObjectContainer, entry);
+
+                    valueObjectContainer.seal();
+
+                    dataObjectContainer.putValue(valueObjectContainer);
+                }
+            }
+
+        return dataObjectContainer;
+    }
+
+    private static void mergeExpandRules(DataObject dataObject,
+                                         ValueObjectContainer valueObjectContainer,
+                                         ExpandRule.Entry entry)
+            throws DataObjectInterpretationException
+    {
+        Method m0, m1;
+        Class<?> type = entry.getExpandedType();
+
+        ExpandRule.At getter = entry.getterInfo();
+        ExpandRule.At setter = entry.setterInfo();
+
+        switch(getter.source())
+        {
+            case THIS:
+                try {
+                    checkReturnType(m0 = dataObject.getType().getMethod(getter.name(), type), type);
+                } catch (NoSuchMethodException e) {
+                    throw new DataObjectMalformationException(String.format("Expanding secondary key (Name: %s, Entry: %s)",
+                            valueObjectContainer.getName(),
+                            entry.name()), e);
+                }
+
+                valueObjectContainer.getter = (object) -> {
+                    try {
+                        return m0.invoke(object, valueObjectContainer.get(object));
+                    } catch (Exception e) {
+                        throw new DataObjectError("Reflection error", e);
+                    }
+                };
+                break;
+
+            case FIELD:
+                try {
+                    checkReturnType(m0 = valueObjectContainer.getType().getMethod(getter.name()), type);
+                } catch (NoSuchMethodException e) {
+                    throw new DataObjectMalformationException(String.format("Expanding secondary key (Name: %s, Entry: %s)",
+                            valueObjectContainer.getName(),
+                            entry.name()), e);
+                }
+
+                valueObjectContainer.getter = (object) -> {
+                    try {
+                        return m0.invoke(valueObjectContainer.get(object));
+                    } catch (Exception e) {
+                        throw new DataObjectError("Reflection error", e);
+                    }
+                };
+                break;
+        }
+
+        switch(setter.source())
+        {
+            case THIS:
+                try {
+                    m1 = dataObject.getType().getMethod(setter.name(), type, type);
+                } catch (NoSuchMethodException e) {
+                    throw new DataObjectMalformationException(String.format("Expanding secondary key (Name: %s, Entry: %s)",
+                            valueObjectContainer.getName(),
+                            entry.name()), e);
+                }
+
+                valueObjectContainer.setter = (object, value) -> {
+                    try {
+                        m1.invoke(object, valueObjectContainer.get(object), value);
+                    } catch (Exception e) {
+                        throw new DataObjectError("Reflection error", e);
+                    }
+                };
+                break;
+
+            case FIELD:
+                try {
+                    m1 = valueObjectContainer.getType().getMethod(setter.name(), type);
+                } catch (NoSuchMethodException e) {
+                    throw new DataObjectMalformationException(String.format("Expanding secondary key (Name: %s, Entry: %s)",
+                            valueObjectContainer.getName(),
+                            entry.name()), e);
+                }
+
+                valueObjectContainer.setter = (object, value) -> {
+                    try {
+                        m1.invoke(valueObjectContainer.get(object), value);
+                    } catch (Exception e) {
+                        throw new DataObjectError("Reflection error", e);
+                    }
+                };
+                break;
+        }
+    }
+
+    private static void checkReturnType(Method method, Class<?> required) throws NoSuchMethodException
+    {
+        if(!method.getReturnType().equals(required))
+            throw new NoSuchMethodException(String.format("Incompatible return type (Found: %s, Required: %s)",
+                    method.getReturnType().getCanonicalName(),
+                    required.getCanonicalName()));
     }
 
     private MultipleDataObject getMultiple0(Class<?> type) throws DataObjectInterpretationException
@@ -1056,6 +1221,9 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
 
             if(setter == null)
                 throw new DataObjectMalformationException("null setter");
+
+            if(primaryKey && expandRule != null)
+                throw new DataObjectMalformationException("Expansion not allowed on primary keys (Name: " + name + ")");
 
             this.sealed = true;
         }
