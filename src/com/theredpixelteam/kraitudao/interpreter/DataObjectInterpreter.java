@@ -25,4 +25,6 @@ public interface DataObjectInterpreter {
     public MultipleDataObject getMultiple(Class<?> type) throws DataObjectInterpretationException;
 
     public UniqueDataObject getUnique(Class<?> type) throws DataObjectInterpretationException;
+
+    public DataObject blur(DataObject dataObject) throws DataObjectInterpretationException;
 }

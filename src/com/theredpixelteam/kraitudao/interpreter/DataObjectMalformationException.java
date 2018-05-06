@@ -1,6 +1,6 @@
-package com.theredpixelteam.kraitudao.dataobject;
+package com.theredpixelteam.kraitudao.interpreter;
 
-public class DataObjectMalformationException extends RuntimeException {
+public class DataObjectMalformationException extends DataObjectInterpretationException {
     public DataObjectMalformationException()
     {
     }

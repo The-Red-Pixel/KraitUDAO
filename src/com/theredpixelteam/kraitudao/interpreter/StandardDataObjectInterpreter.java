@@ -77,6 +77,13 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         return getUnique0(type);
     }
 
+    @Override
+    public DataObject blur(DataObject dataObject) throws DataObjectInterpretationException
+    {
+        //  TODO
+        return null;
+    }
+
     private MultipleDataObject getMultiple0(Class<?> type) throws DataObjectInterpretationException
     {
         MultipleDataObjectContainer container = new MultipleDataObjectContainer(type);
@@ -114,6 +121,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
     }
 
     private void parseClass(Class<?> type, DataObjectContainer container, GlobalExpandRules globalRules, boolean inherited, boolean top)
+            throws DataObjectInterpretationException
     {
         for(BuiltinExpandRule builtinRule : type.getAnnotationsByType(BuiltinExpandRule.class))
         {
@@ -208,6 +216,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
     }
 
     private static ValueObjectContainer parseValueObject(Class<?> type, DataObjectContainer container, InheritanceInfo info)
+            throws DataObjectInterpretationException
     {
         Field f = searchAndCheck(type, info);
 
@@ -223,6 +232,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
     }
 
     private static void parseRules(Class<?> type, Class<?> fieldType, ValueObjectContainer valueObject, InheritanceInfo info)
+            throws DataObjectInterpretationException
     {
         Entry[] entires = info.expanding().entries();
 
@@ -258,6 +268,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
     }
 
     private static Field searchAndCheck(Class<?> type, InheritanceInfo info)
+            throws DataObjectInterpretationException
     {
         Field f = search(type, info);
 
@@ -272,6 +283,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
     }
 
     private static Field search(Class<?> type, InheritanceInfo info)
+            throws DataObjectInterpretationException
     {
         if(info.strict() && (type.getAnnotation(Inheritance.class)) == null)
         {
@@ -339,6 +351,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
     }
 
     private static void parseExpandRuleEntries(ExpandRuleContainer expandRuleContainer, Entry[] entries)
+            throws DataObjectInterpretationException
     {
         for(Entry entry : entries)
         {
@@ -356,6 +369,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
     }
 
     private void parseFields(Class<?> type, DataObjectContainer container, GlobalExpandRules golbalRules, boolean inherited, boolean top)
+            throws DataObjectInterpretationException
     {
         for(Field field : type.getDeclaredFields())
         {
@@ -440,6 +454,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
     }
 
     static void checkArgumentCount(Class<?>[] arguments, int required, String location, String name)
+            throws DataObjectInterpretationException
     {
         if(arguments.length != required)
             throw new DataObjectMalformationException(
@@ -452,6 +467,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
     }
 
     static void checkArgument(Class<?>[] arguments, int index, Class<?> required, String location, String name)
+            throws DataObjectInterpretationException
     {
         if(!arguments[index].equals(required))
             throw new DataObjectMalformationException(
@@ -518,6 +534,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
     }
 
     private void parseMethods(Class<?> type, DataObjectContainer container, boolean inherited, boolean top)
+            throws DataObjectInterpretationException
     {
         for(Method method : type.getDeclaredMethods())
         {
@@ -664,6 +681,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
     }
 
     private static void checkAndRedirectSetter(ValueObjectContainer valueObjectContainer, Class<?> type, Method method, String name)
+            throws DataObjectInterpretationException
     {
         int modifier = method.getModifiers();
 
@@ -709,6 +727,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
     }
 
     private static void checkAndRedirectGetter(ValueObjectContainer valueObjectContainer, Class<?> type, Method method, String name)
+            throws DataObjectInterpretationException
     {
         int modifier = method.getModifiers();
 
@@ -788,11 +807,11 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
 
     private static interface DataObjectContainer extends DataObject
     {
-        void putKey(KeyType type, ValueObject valueObject);
+        void putKey(KeyType type, ValueObject valueObject) throws DataObjectInterpretationException;
 
-        void putValue(ValueObject valueObject);
+        void putValue(ValueObject valueObject) throws DataObjectInterpretationException;
 
-        void seal(); // except internal update
+        void seal() throws DataObjectInterpretationException; // except internal update
 
         boolean sealed();
 
@@ -816,7 +835,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         }
 
         @Override
-        public void seal()
+        public void seal() throws DataObjectInterpretationException
         {
             this.checkSeal();
 
@@ -868,7 +887,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         }
 
         @Override
-        public void putKey(KeyType type, ValueObject valueObject)
+        public void putKey(KeyType type, ValueObject valueObject) throws DataObjectInterpretationException
         {
             this.checkSeal();
 
@@ -882,7 +901,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         }
 
         @Override
-        public void putValue(ValueObject valueObject)
+        public void putValue(ValueObject valueObject) throws DataObjectInterpretationException
         {
             this.checkSeal();
 
@@ -908,7 +927,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         }
 
         @Override
-        public void putKey(KeyType type, ValueObject valueObject)
+        public void putKey(KeyType type, ValueObject valueObject) throws DataObjectInterpretationException
         {
             this.checkSeal();
 
@@ -928,7 +947,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         }
 
         @Override
-        public void putValue(ValueObject valueObject)
+        public void putValue(ValueObject valueObject) throws DataObjectInterpretationException
         {
             this.checkSeal();
 
@@ -939,7 +958,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         }
 
         @Override
-        public void seal()
+        public void seal() throws DataObjectInterpretationException
         {
             this.checkSeal();
 
@@ -1021,7 +1040,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             this.compatibleType = compatibleType;
         }
 
-        void seal()
+        void seal() throws DataObjectInterpretationException
         {
             if(this.sealed)
                 throw new IllegalStateException();
@@ -1284,7 +1303,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             this.expandedType = expandedType;
         }
 
-        void seal()
+        void seal() throws DataObjectInterpretationException
         {
             if(this.sealed)
                 throw new IllegalStateException();
