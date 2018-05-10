@@ -106,7 +106,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
                         valueObjectContainer.secondaryKey = true;
                         valueObjectContainer.owner = dataObject;
 
-                        mergeExpandRules(dataObject, valueObjectContainer, entry);
+                        mergeExpandRules(dataObject, secondaryKey, valueObjectContainer, entry);
 
                         valueObjectContainer.seal();
 
@@ -140,7 +140,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
                     valueObjectContainer.name = name;
                     valueObjectContainer.owner = dataObject;
 
-                    mergeExpandRules(dataObject, valueObjectContainer, entry);
+                    mergeExpandRules(dataObject, value, valueObjectContainer, entry);
 
                     valueObjectContainer.seal();
 
@@ -152,6 +152,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
     }
 
     private static void mergeExpandRules(DataObject dataObject,
+                                         ValueObject origin,
                                          ValueObjectContainer valueObjectContainer,
                                          ExpandRule.Entry entry)
             throws DataObjectInterpretationException
@@ -168,14 +169,14 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
                 try {
                     checkReturnType(m0 = dataObject.getType().getMethod(getter.name(), type), type);
                 } catch (NoSuchMethodException e) {
-                    throw new DataObjectMalformationException(String.format("Expanding secondary key (Name: %s, Entry: %s)",
+                    throw new DataObjectMalformationException(String.format("Expanding (Name: %s, Entry: %s)",
                             valueObjectContainer.getName(),
                             entry.name()), e);
                 }
 
                 valueObjectContainer.getter = (object) -> {
                     try {
-                        return m0.invoke(object, valueObjectContainer.get(object));
+                        return m0.invoke(object, origin.get(object));
                     } catch (Exception e) {
                         throw new DataObjectError("Reflection error", e);
                     }
@@ -184,16 +185,16 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
 
             case FIELD:
                 try {
-                    checkReturnType(m0 = valueObjectContainer.getType().getMethod(getter.name()), type);
+                    checkReturnType(m0 = origin.getType().getMethod(getter.name()), type);
                 } catch (NoSuchMethodException e) {
-                    throw new DataObjectMalformationException(String.format("Expanding secondary key (Name: %s, Entry: %s)",
+                    throw new DataObjectMalformationException(String.format("Expanding (Name: %s, Entry: %s)",
                             valueObjectContainer.getName(),
                             entry.name()), e);
                 }
 
                 valueObjectContainer.getter = (object) -> {
                     try {
-                        return m0.invoke(valueObjectContainer.get(object));
+                        return m0.invoke(origin.get(object));
                     } catch (Exception e) {
                         throw new DataObjectError("Reflection error", e);
                     }
@@ -205,16 +206,16 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         {
             case THIS:
                 try {
-                    m1 = dataObject.getType().getMethod(setter.name(), type, type);
+                    m1 = dataObject.getType().getMethod(setter.name(), origin.getType(), type);
                 } catch (NoSuchMethodException e) {
-                    throw new DataObjectMalformationException(String.format("Expanding secondary key (Name: %s, Entry: %s)",
+                    throw new DataObjectMalformationException(String.format("Expanding (Name: %s, Entry: %s)",
                             valueObjectContainer.getName(),
                             entry.name()), e);
                 }
 
                 valueObjectContainer.setter = (object, value) -> {
                     try {
-                        m1.invoke(object, valueObjectContainer.get(object), value);
+                        m1.invoke(object, origin.get(object), value);
                     } catch (Exception e) {
                         throw new DataObjectError("Reflection error", e);
                     }
@@ -223,7 +224,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
 
             case FIELD:
                 try {
-                    m1 = valueObjectContainer.getType().getMethod(setter.name(), type);
+                    m1 = origin.getType().getMethod(setter.name(), type);
                 } catch (NoSuchMethodException e) {
                     throw new DataObjectMalformationException(String.format("Expanding secondary key (Name: %s, Entry: %s)",
                             valueObjectContainer.getName(),
@@ -232,7 +233,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
 
                 valueObjectContainer.setter = (object, value) -> {
                     try {
-                        m1.invoke(valueObjectContainer.get(object), value);
+                        m1.invoke(origin.get(object), value);
                     } catch (Exception e) {
                         throw new DataObjectError("Reflection error", e);
                     }
