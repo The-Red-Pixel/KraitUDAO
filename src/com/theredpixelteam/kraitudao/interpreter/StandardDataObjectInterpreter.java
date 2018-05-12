@@ -4,6 +4,7 @@ import com.theredpixelteam.kraitudao.PlaceHolder;
 import com.theredpixelteam.kraitudao.annotations.*;
 import com.theredpixelteam.kraitudao.annotations.expandable.*;
 import com.theredpixelteam.kraitudao.annotations.inheritance.*;
+import com.theredpixelteam.kraitudao.annotations.metadata.Metadata;
 import com.theredpixelteam.kraitudao.dataobject.*;
 import com.theredpixelteam.redtea.predication.MultiCondition;
 import com.theredpixelteam.redtea.predication.MultiPredicate;
@@ -255,6 +256,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         MultipleDataObjectContainer container = new MultipleDataObjectContainer(type);
 
         parse(type, container, type.getAnnotation(Inheritance.class) != null, true);
+        container.seal();
 
         return container;
     }
@@ -264,6 +266,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         UniqueDataObjectContainer container = new UniqueDataObjectContainer(type);
 
         parse(type, container, type.getAnnotation(Inheritance.class) != null, true);
+        container.seal();
 
         return container;
     }
@@ -279,6 +282,11 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             parseClass(type, container, globalRules, inherited, top);
             parseFields(type, container, globalRules, inherited, top);
             parseMethods(type, container, inherited, top);
+
+            ValueObjectContainer valueObjectContainer;
+            for(ValueObject valueObject : container.getValues().values())
+                if(!(valueObjectContainer = (ValueObjectContainer) valueObject).sealed)
+                    valueObjectContainer.seal();
         } catch (DataObjectInterpretationException e) {
             throw e;
         } catch (Exception e) {
@@ -608,6 +616,11 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
 
                 valueObject.expandRule = expandRuleContainer;
             }
+
+            // metadata
+            for(Annotation annotation : field.getDeclaredAnnotations())
+                if(annotation.annotationType().getAnnotation(Metadata.class) != null)
+                    valueObject.metadata.put(annotation.annotationType(), annotation);
 
             if(top)
                 valueObject.seal();
@@ -1204,6 +1217,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             this.ownerType = owner;
             this.type = type;
             this.compatibleType = compatibleType;
+            this.metadata = new HashMap<>();
         }
 
         void seal() throws DataObjectInterpretationException
@@ -1225,6 +1239,8 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
 
             if(primaryKey && expandRule != null)
                 throw new DataObjectMalformationException("Expansion not allowed on primary keys (Name: " + name + ")");
+
+            this.metadata = Collections.unmodifiableMap(this.metadata);
 
             this.sealed = true;
         }
@@ -1330,6 +1346,12 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             return Optional.ofNullable(this.expandRule);
         }
 
+        @Override
+        public <T extends Annotation> Optional<T> getMetadata(Class<T> type)
+        {
+            return Optional.ofNullable((T) metadata.get(type));
+        }
+
         final Class<?> ownerType;
 
         String name;
@@ -1349,6 +1371,8 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         Getter getter;
 
         Setter setter;
+
+        private Map<Class<?>, Annotation> metadata;
 
         private boolean sealed;
 
