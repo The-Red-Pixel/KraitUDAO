@@ -2,7 +2,7 @@ package com.theredpixelteam.kraitudao.common;
 
 import com.theredpixelteam.kraitudao.DataSource;
 import com.theredpixelteam.kraitudao.DataSourceException;
-import com.theredpixelteam.kraitudao.Transition;
+import com.theredpixelteam.kraitudao.Transaction;
 import com.theredpixelteam.kraitudao.dataobject.DataObject;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
 
@@ -57,49 +57,49 @@ public class PlainDatabaseDataSource implements DataSource {
     }
 
     @Override
-    public Transition commit(Transition transition, Collection<Object> objects) throws DataSourceException
+    public Transaction commit(Transaction transition, Collection<Object> objects) throws DataSourceException
     {
         return null;
     }
 
     @Override
-    public <T> Transition commit(Transition transition, T object, Class<T> type) throws DataSourceException
+    public <T> Transaction commit(Transaction transition, T object, Class<T> type) throws DataSourceException
     {
         return null;
     }
 
     @Override
-    public <T> Transition remove(T object) throws DataSourceException
+    public <T> Transaction remove(T object) throws DataSourceException
     {
         return null;
     }
 
     @Override
-    public <T> Transition remove(Transition transition, T object) throws DataSourceException
+    public <T> Transaction remove(Transaction transition, T object) throws DataSourceException
     {
         return null;
     }
 
     @Override
-    public <T> Transition clear() throws DataSourceException
+    public <T> Transaction clear() throws DataSourceException
     {
         return null;
     }
 
     @Override
-    public <T> Transition clear(Transition transition) throws DataSourceException
+    public <T> Transaction clear(Transaction transition) throws DataSourceException
     {
         return null;
     }
 
     @Override
-    public <T> Transition removeVaguely(T object) throws DataSourceException
+    public <T> Transaction removeVaguely(T object) throws DataSourceException
     {
         return null;
     }
 
     @Override
-    public <T> Transition removeVaguely(Transition transition, T object) throws DataSourceException
+    public <T> Transaction removeVaguely(Transaction transition, T object) throws DataSourceException
     {
         return null;
     }
@@ -109,7 +109,7 @@ public class PlainDatabaseDataSource implements DataSource {
         return Optional.ofNullable(MAPPING.get(type));
     }
 
-    private Transition currentTransistion;
+    private Transaction currentTransaction;
 
     protected String tableName;
 
@@ -146,19 +146,64 @@ public class PlainDatabaseDataSource implements DataSource {
         }
     };
 
-    private static class TransitionImpl implements Transition
+    private class TransactionImpl implements Transaction
     {
+        TransactionImpl()
+        {
+        }
 
         @Override
-        public void push() throws DataSourceException
+        public boolean push() throws DataSourceException
         {
+            if(!valid)
+                return false;
 
+            try {
+                connection.commit();
+            } catch (SQLException e) {
+                throw new DataSourceException(e);
+            }
+
+            destroy();
+            return true;
         }
 
         @Override
         public boolean cancel()
         {
-            return false;
+            if(!valid)
+                return false;
+
+            try {
+                connection.rollback();
+            } catch (SQLException e) {
+                this.lastException = new DataSourceException(e);
+                return false;
+            }
+
+            destroy();
+            return true;
         }
+
+        @Override
+        public Optional<Exception> getLastException()
+        {
+            return Optional.ofNullable(this.lastException);
+        }
+
+        void destroy()
+        {
+            this.valid = false;
+            currentTransaction = null;
+        }
+
+        boolean valid()
+        {
+            return valid;
+        }
+
+        private Exception lastException;
+
+        private boolean valid = true;
     }
 }
