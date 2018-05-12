@@ -1,9 +1,8 @@
 package com.theredpixelteam.kraitudao.dataobject;
 
-import java.lang.annotation.Annotation;
 import java.util.Optional;
 
-public interface ValueObject {
+public interface ValueObject extends Metadatable {
     public String getName();
 
     public Class<?> getType();
@@ -31,10 +30,4 @@ public interface ValueObject {
 
     public Optional<ExpandRule> getExpandRule();
 
-    public <T extends Annotation> Optional<T> getMetadata(Class<T> type);
-
-    public default <T extends Annotation> boolean hasMetadata(Class<T> type)
-    {
-        return getMetadata(type).isPresent();
-    }
 }

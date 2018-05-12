@@ -4,7 +4,9 @@ import com.theredpixelteam.kraitudao.PlaceHolder;
 import com.theredpixelteam.kraitudao.annotations.*;
 import com.theredpixelteam.kraitudao.annotations.expandable.*;
 import com.theredpixelteam.kraitudao.annotations.inheritance.*;
+import com.theredpixelteam.kraitudao.annotations.metadata.ExpandedName;
 import com.theredpixelteam.kraitudao.annotations.metadata.Metadata;
+import com.theredpixelteam.kraitudao.annotations.metadata.MetadataCollection;
 import com.theredpixelteam.kraitudao.dataobject.*;
 import com.theredpixelteam.redtea.predication.MultiCondition;
 import com.theredpixelteam.redtea.predication.MultiPredicate;
@@ -12,10 +14,7 @@ import com.theredpixelteam.redtea.predication.NamedPredicate;
 import com.theredpixelteam.redtea.util.Reference;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.AnnotatedElement;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
+import java.lang.reflect.*;
 import java.util.*;
 
 @SuppressWarnings("unchecked")
@@ -545,8 +544,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
     private void parseFields(Class<?> type, DataObjectContainer container, GlobalExpandRules golbalRules, boolean inherited, boolean top)
             throws DataObjectInterpretationException
     {
-        for(Field field : type.getDeclaredFields())
-        {
+        for(Field field : type.getDeclaredFields()) {
             MultiCondition.CurrentCondition<Class<?>> current;
 
             current = annotationCondition.apply(
@@ -562,8 +560,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
 
             Value valueInfo;
 
-            if(current.getCurrent().trueCount() != 0)
-            {
+            if (current.getCurrent().trueCount() != 0) {
                 Reference<String> name = new Reference<>();
 
                 current.completelyOnlyIf(Key.class)
@@ -589,8 +586,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
                         });
 
                 valueObject.name = name.get().isEmpty() ? field.getName() : name.get();
-            }
-            else if((valueInfo = field.getAnnotation(Value.class)) != null)
+            } else if ((valueInfo = field.getAnnotation(Value.class)) != null)
                 valueObject.name = valueInfo.value().isEmpty() ? field.getName() : valueInfo.value();
             else
                 continue;
@@ -601,11 +597,11 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
 
             // expand rule
             Expandable expandInfo;
-            if((expandInfo = field.getAnnotation(Expandable.class)) != null)
+            if ((expandInfo = field.getAnnotation(Expandable.class)) != null)
             {
                 Entry[] entries = expandInfo.entries();
 
-                if(entries.length == 0)
+                if (entries.length == 0)
                     throw new DataObjectMalformationException("Expand rule of \"" + field.getName() + "\" has no entry");
 
                 ExpandRuleContainer expandRuleContainer = new ExpandRuleContainer(field.getType());
@@ -618,9 +614,95 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             }
 
             // metadata
-            for(Annotation annotation : field.getDeclaredAnnotations())
-                if(annotation.annotationType().getAnnotation(Metadata.class) != null)
-                    valueObject.metadata.put(annotation.annotationType(), annotation);
+            ExpandRuleContainer rule;
+            if ((rule = (ExpandRuleContainer) valueObject.expandRule) == null)
+                for (Annotation annotation : field.getDeclaredAnnotations())
+                    if (annotation.annotationType().getAnnotation(MetadataCollection.class) == null)
+                        if (annotation.annotationType().getAnnotation(Metadata.class) != null)
+                            if (valueObject.metadata.putIfAbsent(annotation.annotationType(), annotation) != null)
+                                throw new DataObjectMalformationException(String.format(
+                                        "Duplicated metadata (Type: @%s, Value name: %s)",
+                                        annotation.annotationType().getCanonicalName(),
+                                        valueObject.getName()
+                                ));
+                            else ;
+                        else ;
+                    else
+                        throw new DataObjectMalformationException(
+                                "Metadata collection not supported for non-expandable value (Value Name: " + valueObject.getName() + ")");
+            else
+            {
+                Map<String, EntryContainer> map = new HashMap<>();
+
+                for(ExpandRuleContainer.Entry entry : rule.entries)
+                    map.put(entry.name(), (EntryContainer) entry);
+
+                Map<Class<?>, Method> cache = new HashMap<>();
+                for(Annotation anno : field.getDeclaredAnnotations())
+                {
+                    MetadataCollection collectionInfo = null;
+                    if(anno.annotationType().getAnnotation(Metadata.class) == null
+                            && (collectionInfo = anno.annotationType().getAnnotation(MetadataCollection.class)) == null)
+                        continue;
+
+                    List<Annotation> annos;
+
+                    if(collectionInfo != null)
+                        try {
+                            annos = (List) Arrays.asList((Object[]) collectionInfo.annotationType().getMethod("value").invoke(collectionInfo));
+                        } catch (Exception e) {
+                            throw new DataObjectMalformationException(String.format(
+                                    "Failed to unpack the metadata collection of %s (Type: %s)",
+                                    collectionInfo.value().getCanonicalName(),
+                                    collectionInfo.annotationType().getCanonicalName()
+                            ));
+                        }
+                    else
+                        annos = Collections.singletonList(anno);
+
+                    for(Annotation annotation : annos)
+                    {
+                        Class<?> annotationType = annotation.annotationType();
+                        Method m;
+
+                        if ((m = cache.get(annotationType)) == null)
+                        {
+                            for (Method method : annotationType.getMethods())
+                                if (method.getAnnotation(ExpandedName.class) != null)
+                                {
+                                    if (m != null)
+                                        throw new DataObjectMalformationException("Duplicated expanded name metadata for @" + annotationType.getCanonicalName());
+
+                                    m = method;
+                                }
+
+                            if (m == null)
+                                throw new DataObjectMalformationException(
+                                        "@" + annotationType.getCanonicalName() + " is not supported for expandable value (@ExpandedName metadata not found)");
+
+                            cache.put(annotationType, m);
+                        }
+
+                        String name;
+                        try {
+                            name = (String) m.invoke(annotation);
+                        } catch (Exception e) {
+                            throw new DataObjectMalformationException("Unable to get @ExpandedName metadata", e);
+                        }
+
+                        EntryContainer ruleEntry;
+                        if ((ruleEntry = map.get(name)) == null)
+                            throw new DataObjectMalformationException("Incorrect expanded name");
+
+                        if (ruleEntry.metadata.putIfAbsent(annotationType, annotation) != null)
+                            throw new DataObjectMalformationException(String.format(
+                                    "Duplicated metadata (Type: %s, Value Name: %s)",
+                                    annotationType.getCanonicalName(),
+                                    valueObject.getName()
+                            ));
+                    }
+                }
+            }
 
             if(top)
                 valueObject.seal();
@@ -1463,6 +1545,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
                 throw new IllegalStateException();
 
             this.entryList.toArray(this.entries = new Entry[this.entryList.size()]);
+            this.entryList = null;
 
             this.sealed = true;
         }
@@ -1494,6 +1577,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         {
             this.name = name;
             this.expandedType = expandedType;
+            this.metadata = new HashMap<>();
         }
 
         void seal() throws DataObjectInterpretationException
@@ -1506,6 +1590,8 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
 
             if(this.setterInfo == null)
                 throw new DataObjectMalformationException("Setter info undefined");
+
+            this.metadata = Collections.unmodifiableMap(metadata);
 
             this.sealed = true;
         }
@@ -1534,6 +1620,12 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             return this.expandedType;
         }
 
+        @Override
+        public <T extends Annotation> Optional<T> getMetadata(Class<T> type)
+        {
+            return Optional.ofNullable((T) metadata.get(type));
+        }
+
         ExpandRule.At getterInfo;
 
         ExpandRule.At setterInfo;
@@ -1543,6 +1635,8 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         final String name;
 
         private boolean sealed;
+
+        private Map<Class<?>, Annotation> metadata;
 
         private static class AtInfo implements ExpandRule.At
         {

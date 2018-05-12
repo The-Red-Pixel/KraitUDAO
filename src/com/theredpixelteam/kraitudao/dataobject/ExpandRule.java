@@ -7,7 +7,7 @@ public interface ExpandRule {
 
     public Entry[] getEntries();
 
-    public interface Entry {
+    public interface Entry extends Metadatable {
         public String name();
 
         public At getterInfo();
