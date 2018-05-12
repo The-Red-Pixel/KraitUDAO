@@ -11,6 +11,7 @@ import java.sql.SQLException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 public class PlainDatabaseDataSource implements DataSource {
     public PlainDatabaseDataSource(Connection connection, String tableName, DataObjectInterpreter interpreter)
@@ -103,29 +104,61 @@ public class PlainDatabaseDataSource implements DataSource {
         return null;
     }
 
+    public static Optional<String> getSQLType(Class<?> type)
+    {
+        return Optional.ofNullable(MAPPING.get(type));
+    }
+
+    private Transition currentTransistion;
+
     protected String tableName;
 
     protected Connection connection;
 
     protected DataObjectInterpreter interpreter;
 
-    protected static final Map<Class<?>, DataObject> cache = new HashMap<>();
+    protected static final Map<Class<?>, DataObject> CACHE = new HashMap<>();
 
     private static final Map<Class<?>, Class<?>> BOXING = new HashMap<Class<?>, Class<?>>() {
         {
-            put(Boolean.class, boolean.class);
-            put(Character.class, char.class);
-            put(Short.class, short.class);
-            put(Integer.class, int.class);
-            put(Long.class, long.class);
-            put(Float.class, float.class);
-            put(Double.class, double.class);
+            //  Boxed type       |  Unboxed type
+            put(Boolean.class,      boolean.class);
+            put(Character.class,    char.class);
+            put(Short.class,        short.class);
+            put(Integer.class,      int.class);
+            put(Long.class,         long.class);
+            put(Float.class,        float.class);
+            put(Double.class,       double.class);
         }
     };
 
     private static final Map<Class<?>, String> MAPPING = new HashMap<Class<?>, String>() {
         {
-
+            //  Java type        |  SQL type
+            put(boolean.class,      "BOOLEAN");
+            put(byte.class,         "BINARY(1)");
+            put(char.class,         "NCHAR(1)");
+            put(short.class,        "SMALLINT");
+            put(int.class,          "INTEGER");
+            put(long.class,         "BIGINT");
+            put(float.class,        "REAL");
+            put(double.class,       "FLOAT");
         }
     };
+
+    private static class TransitionImpl implements Transition
+    {
+
+        @Override
+        public void push() throws DataSourceException
+        {
+
+        }
+
+        @Override
+        public boolean cancel()
+        {
+            return false;
+        }
+    }
 }
