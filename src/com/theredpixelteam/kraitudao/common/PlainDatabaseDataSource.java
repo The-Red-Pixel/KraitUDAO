@@ -6,6 +6,7 @@ import com.theredpixelteam.kraitudao.Transaction;
 import com.theredpixelteam.kraitudao.dataobject.DataObject;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Collection;
@@ -109,6 +110,30 @@ public class PlainDatabaseDataSource implements DataSource {
         return Optional.ofNullable(MAPPING.get(type));
     }
 
+    public static void createTable(Connection connection, String tableName) throws SQLException
+    {
+        createTable0(connection, "CREATE TABLE " + tableName);
+    }
+
+    public static void createTableIfNotExists(Connection connection, String tableName) throws SQLException
+    {
+        createTable0(connection, "CREATE TABLE IF NOT EXISTS " + tableName);
+    }
+
+    private static boolean createTable0(Connection connection, String statement) throws SQLException
+    {
+        StringBuilder stmt = new StringBuilder("(");
+
+
+    }
+
+    private static Class<?> tryToUnbox(Class<?> type)
+    {
+        Class<?> unboxed = BOXING.get(type);
+
+        return unboxed == null ? type : unboxed;
+    }
+
     private Transaction currentTransaction;
 
     protected String tableName;
@@ -143,8 +168,21 @@ public class PlainDatabaseDataSource implements DataSource {
             put(long.class,         "BIGINT");
             put(float.class,        "REAL");
             put(double.class,       "FLOAT");
+            put(String.class,       "NVARCHAR");
+            put(BigDecimal.class,   "DECIMAL");
         }
     };
+
+    private static final Map<Class<?>, TypeDecorator> TYPE_DECORATORS = new HashMap<Class<?>, TypeDecorator>() {
+        {
+            
+        }
+    };
+
+    private interface TypeDecorator
+    {
+        String decorate(String type, DataObject dataObject);
+    }
 
     private class TransactionImpl implements Transaction
     {
