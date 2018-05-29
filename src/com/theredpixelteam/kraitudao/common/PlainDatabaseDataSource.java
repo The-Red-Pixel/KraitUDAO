@@ -3,11 +3,12 @@ package com.theredpixelteam.kraitudao.common;
 import com.theredpixelteam.kraitudao.DataSource;
 import com.theredpixelteam.kraitudao.DataSourceException;
 import com.theredpixelteam.kraitudao.Transaction;
-import com.theredpixelteam.kraitudao.dataobject.DataObject;
+import com.theredpixelteam.kraitudao.dataobject.*;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
 
 import java.math.BigDecimal;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Collection;
 import java.util.HashMap;
@@ -110,21 +111,72 @@ public class PlainDatabaseDataSource implements DataSource {
         return Optional.ofNullable(MAPPING.get(type));
     }
 
-    public static void createTable(Connection connection, String tableName) throws SQLException
+    public static int createTable(Connection connection, String tableName, DataObject dataObject) throws SQLException
     {
-        createTable0(connection, "CREATE TABLE " + tableName);
+        return createTable0(connection, "CREATE TABLE " + tableName, dataObject);
     }
 
-    public static void createTableIfNotExists(Connection connection, String tableName) throws SQLException
+    public static int createTableIfNotExists(Connection connection, String tableName, DataObject dataObject) throws SQLException
     {
-        createTable0(connection, "CREATE TABLE IF NOT EXISTS " + tableName);
+        return createTable0(connection, "CREATE TABLE IF NOT EXISTS " + tableName, dataObject);
     }
 
-    private static boolean createTable0(Connection connection, String statement) throws SQLException
+    private static int createTable0(Connection connection, String statement, DataObject dataObject) throws SQLException
     {
         StringBuilder stmt = new StringBuilder("(");
+        StringBuilder constraint = new StringBuilder();
 
+        if(dataObject instanceof UniqueDataObject)
+        {
+            UniqueDataObject uniqueDataObject = (UniqueDataObject) dataObject;
+            ValueObject key = uniqueDataObject.getKey();
 
+            appendTableElement(stmt, key);
+            // TODO
+        }
+        else if(dataObject instanceof MultipleDataObject)
+        {
+            MultipleDataObject multipleDataObject = (MultipleDataObject) dataObject;
+            ValueObject primaryKey = multipleDataObject.getPrimaryKey();
+
+            appendTableElement(stmt, primaryKey);
+            // TODO
+
+            for(ValueObject secondaryKey : multipleDataObject.getSecondaryKeys().values())
+            {
+                appendTableElement(stmt, secondaryKey);
+                // TODO
+            }
+        }
+        else
+            throw new DataObjectException("Illegal or unsupported data object type");
+
+        for(ValueObject valueObject : dataObject.getValues().values())
+            appendTableElement(stmt, valueObject);
+
+        stmt.append(constraint).append(")");
+
+        PreparedStatement preparedStatement = connection.prepareStatement(stmt.toString());
+        int n = preparedStatement.executeUpdate();
+
+        preparedStatement.close();
+
+        return n;
+    }
+
+    private static void appendTableElement(StringBuilder stmt, ValueObject valueObject)
+    {
+        Class<?> type = tryToUnbox(valueObject.getType());
+        String typeString = MAPPING.get(type);
+
+        if(typeString == null)
+            throw new DataObjectException("Unsupported type: " + type.getCanonicalName() + " (PLEASE Try to use expandable value)");
+
+        TypeDecorator typeDecorator = TYPE_DECORATORS.get(type);
+        if(typeDecorator != null)
+            typeString = typeDecorator.decorate(typeString, valueObject);
+
+        stmt.append(typeString).append(" ").append(valueObject.getName()).append(",");
     }
 
     private static Class<?> tryToUnbox(Class<?> type)
@@ -181,7 +233,7 @@ public class PlainDatabaseDataSource implements DataSource {
 
     private interface TypeDecorator
     {
-        String decorate(String type, DataObject dataObject);
+        String decorate(String type, ValueObject valueObject);
     }
 
     private class TransactionImpl implements Transaction
