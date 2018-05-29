@@ -123,7 +123,7 @@ public class PlainDatabaseDataSource implements DataSource {
 
     private static int createTable0(Connection connection, String statement, DataObject dataObject) throws SQLException
     {
-        StringBuilder stmt = new StringBuilder("(");
+        StringBuilder stmt = new StringBuilder(statement).append(" (");
         StringBuilder constraint = new StringBuilder();
 
         if(dataObject instanceof UniqueDataObject)
@@ -132,7 +132,9 @@ public class PlainDatabaseDataSource implements DataSource {
             ValueObject key = uniqueDataObject.getKey();
 
             appendTableElement(stmt, key);
-            // TODO
+
+            constraint.append(String.format("CONSTRAINT CONSTRAINT_KEY PRIMARY KEY (%s)",
+                    key.getName()));
         }
         else if(dataObject instanceof MultipleDataObject)
         {
@@ -140,13 +142,26 @@ public class PlainDatabaseDataSource implements DataSource {
             ValueObject primaryKey = multipleDataObject.getPrimaryKey();
 
             appendTableElement(stmt, primaryKey);
-            // TODO
 
+
+            constraint.append(
+                            String.format("CONSTRAINT CONSTRAINT_PRIMARY_KEY PRIMARY KEY (%s)",
+                                    primaryKey.getName()))
+                    .append("CONSTRAINT CONSTRAINT_SECONDARY_KEYS SECONDARY KEY (");
+
+            Collection<ValueObject> valueObjectCollection = multipleDataObject.getSecondaryKeys().values();
+            int valueObjectCollectionSize = valueObjectCollection.size(), i = 0;
             for(ValueObject secondaryKey : multipleDataObject.getSecondaryKeys().values())
             {
                 appendTableElement(stmt, secondaryKey);
-                // TODO
+
+                constraint.append(secondaryKey.getName());
+
+                if(++i < valueObjectCollectionSize)
+                    constraint.append(",");
             }
+
+            constraint.append(")");
         }
         else
             throw new DataObjectException("Illegal or unsupported data object type");
