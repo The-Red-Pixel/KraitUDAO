@@ -16,18 +16,30 @@ import java.util.Map;
 import java.util.Optional;
 
 public class PlainDatabaseDataSource implements DataSource {
-    public PlainDatabaseDataSource(Connection connection, String tableName, DataObjectInterpreter interpreter)
+    public PlainDatabaseDataSource(Connection connection,
+                                   String tableName,
+                                   DataObjectInterpreter interpreter,
+                                   DataObjectContainer container)
             throws DataSourceException
     {
         this.connection = connection;
         this.tableName = tableName;
         this.interpreter = interpreter;
+        this.container = container;
 
         try {
             this.connection.setAutoCommit(false);
         } catch (SQLException e) {
             throw new DataSourceException(e);
         }
+    }
+
+    public PlainDatabaseDataSource(Connection connection,
+                                   String tableName,
+                                   DataObjectInterpreter interpreter)
+            throws DataSourceException
+    {
+        this(connection, tableName, interpreter, DataObjectCache.getGlobal());
     }
 
     public Connection getConnection()
@@ -208,6 +220,8 @@ public class PlainDatabaseDataSource implements DataSource {
     protected Connection connection;
 
     protected DataObjectInterpreter interpreter;
+
+    protected final DataObjectContainer container;
 
     protected static final Map<Class<?>, DataObject> CACHE = new HashMap<>();
 
