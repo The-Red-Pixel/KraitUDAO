@@ -26,5 +26,5 @@ public interface DataObjectInterpreter {
 
     public UniqueDataObject getUnique(Class<?> type) throws DataObjectInterpretationException;
 
-    public DataObject mergeExpansion(DataObject dataObject) throws DataObjectInterpretationException;
+    public DataObject expand(DataObject dataObject) throws DataObjectInterpretationException;
 }

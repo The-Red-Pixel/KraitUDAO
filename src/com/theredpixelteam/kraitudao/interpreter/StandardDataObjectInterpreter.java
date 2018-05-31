@@ -78,7 +78,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
     }
 
     @Override
-    public DataObject mergeExpansion(DataObject dataObject) throws DataObjectInterpretationException
+    public DataObject expand(DataObject dataObject) throws DataObjectInterpretationException
     {
         DataObjectContainer dataObjectContainer;
 
