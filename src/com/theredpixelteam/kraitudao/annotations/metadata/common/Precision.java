@@ -14,9 +14,9 @@ public @interface Precision {
     @ExpandedName
     String name() default "";
 
-    int p();
+    int integer(); // integer digits
 
-    int s();
+    int decimal() default 0; // decimal digits
 
     @MetadataCollection(Precision.class)
     @Retention(RetentionPolicy.RUNTIME)

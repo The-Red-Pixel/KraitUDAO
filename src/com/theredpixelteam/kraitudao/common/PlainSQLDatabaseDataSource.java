@@ -3,10 +3,14 @@ package com.theredpixelteam.kraitudao.common;
 import com.theredpixelteam.kraitudao.DataSource;
 import com.theredpixelteam.kraitudao.DataSourceException;
 import com.theredpixelteam.kraitudao.Transaction;
+import com.theredpixelteam.kraitudao.annotations.metadata.common.Precision;
+import com.theredpixelteam.kraitudao.annotations.metadata.common.Size;
 import com.theredpixelteam.kraitudao.dataobject.*;
+import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -15,8 +19,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
-public class PlainDatabaseDataSource implements DataSource {
-    public PlainDatabaseDataSource(Connection connection,
+public class PlainSQLDatabaseDataSource implements DataSource {
+    public PlainSQLDatabaseDataSource(Connection connection,
                                    String tableName,
                                    DataObjectInterpreter interpreter,
                                    DataObjectContainer container)
@@ -34,7 +38,7 @@ public class PlainDatabaseDataSource implements DataSource {
         }
     }
 
-    public PlainDatabaseDataSource(Connection connection,
+    public PlainSQLDatabaseDataSource(Connection connection,
                                    String tableName,
                                    DataObjectInterpreter interpreter)
             throws DataSourceException
@@ -118,14 +122,32 @@ public class PlainDatabaseDataSource implements DataSource {
         return null;
     }
 
+    @Override
+    public void waitForTransaction()
+    {
+        while(this.currentTransaction != null);
+    }
+
     public static Optional<String> getSQLType(Class<?> type)
     {
         return Optional.ofNullable(MAPPING.get(type));
     }
 
+    public int createTable(Connection conection, String tableName, Class<?> dataType)
+            throws SQLException, DataObjectInterpretationException
+    {
+        return createTable(conection, tableName, container.interpretIfAbsent(dataType, interpreter));
+    }
+
     public static int createTable(Connection connection, String tableName, DataObject dataObject) throws SQLException
     {
         return createTable0(connection, "CREATE TABLE " + tableName, dataObject);
+    }
+
+    public int createTableIfNotExists(Connection connection, String tableName, Class<?> dataType)
+            throws SQLException, DataObjectInterpretationException
+    {
+        return createTable(connection, tableName, container.interpretIfAbsent(dataType, interpreter));
     }
 
     public static int createTableIfNotExists(Connection connection, String tableName, DataObject dataObject) throws SQLException
@@ -213,7 +235,7 @@ public class PlainDatabaseDataSource implements DataSource {
         return unboxed == null ? type : unboxed;
     }
 
-    private Transaction currentTransaction;
+    private volatile Transaction currentTransaction;
 
     protected String tableName;
 
@@ -247,16 +269,53 @@ public class PlainDatabaseDataSource implements DataSource {
             put(short.class,        "SMALLINT");
             put(int.class,          "INTEGER");
             put(long.class,         "BIGINT");
-            put(float.class,        "REAL");
-            put(double.class,       "FLOAT");
+            put(float.class,        "FLOAT");
+            put(double.class,       "DOUBLE");
             put(String.class,       "NVARCHAR");
             put(BigDecimal.class,   "DECIMAL");
+            put(BigInteger.class,   "BIGINT");
         }
     };
 
     private static final Map<Class<?>, TypeDecorator> TYPE_DECORATORS = new HashMap<Class<?>, TypeDecorator>() {
         {
-            
+            TypeDecorator integerPrecisionDecorator = (type, valueObject) -> {
+                Optional<Precision> metadata = valueObject.getMetadata(Precision.class);
+
+                if(!metadata.isPresent())
+                    return type;
+                else
+                    return type + "(" + metadata.get().integer() + ")";
+            };
+
+            TypeDecorator decimalPrecisionDecorator = (type, valueObject) -> {
+                Optional<Precision> metadata = valueObject.getMetadata(Precision.class);
+
+                if(!metadata.isPresent())
+                    return type;
+
+                Precision precision = metadata.get();
+
+                return type + "(" + precision.integer() + "," + precision.decimal() + ")";
+            };
+
+            put(String.class, (type, valueObject) -> {
+                Optional<Size> metadata = valueObject.getMetadata(Size.class);
+
+                if(!metadata.isPresent())
+                    return type;
+                else
+                    return type + "(" + metadata.get().value() + ")";
+            });
+
+            put(short.class, integerPrecisionDecorator);
+            put(int.class, integerPrecisionDecorator);
+            put(long.class, integerPrecisionDecorator);
+            put(BigInteger.class, integerPrecisionDecorator);
+
+            put(float.class, decimalPrecisionDecorator);
+            put(double.class, decimalPrecisionDecorator);
+            put(BigDecimal.class, decimalPrecisionDecorator);
         }
     };
 

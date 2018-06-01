@@ -49,4 +49,6 @@ public interface DataSource {
     }
 
     public <T> Transaction removeVaguely(Transaction transition, T object) throws DataSourceException;
+
+    public void waitForTransaction();
 }

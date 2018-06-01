@@ -14,7 +14,7 @@ public @interface Size {
     @ExpandedName
     String name() default "";
 
-    int n();
+    int value();
 
     @MetadataCollection(Size.class)
     @Retention(RetentionPolicy.RUNTIME)
