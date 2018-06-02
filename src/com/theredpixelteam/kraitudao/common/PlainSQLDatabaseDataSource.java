@@ -3,6 +3,7 @@ package com.theredpixelteam.kraitudao.common;
 import com.theredpixelteam.kraitudao.DataSource;
 import com.theredpixelteam.kraitudao.DataSourceException;
 import com.theredpixelteam.kraitudao.Transaction;
+import com.theredpixelteam.kraitudao.annotations.metadata.common.NotNull;
 import com.theredpixelteam.kraitudao.annotations.metadata.common.Precision;
 import com.theredpixelteam.kraitudao.annotations.metadata.common.Size;
 import com.theredpixelteam.kraitudao.dataobject.*;
@@ -227,7 +228,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         if(typeDecorator != null)
             typeString = typeDecorator.decorate(typeString, valueObject);
 
-        stmt.append(typeString).append(" ").append(valueObject.getName()).append(",");
+        stmt.append(String.format(typeString, valueObject.getName())).append(",");
     }
 
     private static Class<?> tryToUnbox(Class<?> type)
@@ -235,6 +236,17 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         Class<?> unboxed = BOXING.get(type);
 
         return unboxed == null ? type : unboxed;
+    }
+
+    private static TypeDecorator of(TypeDecorator... decorators)
+    {
+        final TypeDecorator[] sequence = decorators;
+        return (type, valueObject) -> {
+            for(TypeDecorator decorator : sequence)
+                type = decorator.decorate(type, valueObject);
+
+            return type;
+        };
     }
 
     private volatile Transaction currentTransaction;
@@ -281,16 +293,27 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
     private static final Map<Class<?>, TypeDecorator> TYPE_DECORATORS = new HashMap<Class<?>, TypeDecorator>() {
         {
-            TypeDecorator integerPrecisionDecorator = (type, valueObject) -> {
+            TypeDecorator notNullDecorator = (type, valueObject) -> {
+                Optional<NotNull> metadata = valueObject.getMetadata(NotNull.class);
+
+                if(!metadata.isPresent())
+                    return type;
+                else
+                    return type + " NOT NULL";
+            };
+
+            TypeDecorator placer = (type, valueObject) -> type + " %s";
+
+            TypeDecorator integerPrecisionDecorator = of((type, valueObject) -> {
                 Optional<Precision> metadata = valueObject.getMetadata(Precision.class);
 
                 if(!metadata.isPresent())
                     return type;
                 else
                     return type + "(" + metadata.get().integer() + ")";
-            };
+            }, placer, notNullDecorator);
 
-            TypeDecorator decimalPrecisionDecorator = (type, valueObject) -> {
+            TypeDecorator decimalPrecisionDecorator = of((type, valueObject) -> {
                 Optional<Precision> metadata = valueObject.getMetadata(Precision.class);
 
                 if(!metadata.isPresent())
@@ -299,16 +322,16 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                 Precision precision = metadata.get();
 
                 return type + "(" + precision.integer() + "," + precision.decimal() + ")";
-            };
+            }, placer, notNullDecorator);
 
-            put(String.class, (type, valueObject) -> {
+            put(String.class, of((type, valueObject) -> {
                 Optional<Size> metadata = valueObject.getMetadata(Size.class);
 
                 if(!metadata.isPresent())
                     return type;
                 else
                     return type + "(" + metadata.get().value() + ")";
-            });
+            }, placer, notNullDecorator));
 
             put(short.class, integerPrecisionDecorator);
             put(int.class, integerPrecisionDecorator);
