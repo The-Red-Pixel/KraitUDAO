@@ -1,6 +1,7 @@
 package com.theredpixelteam.kraitudao.dataobject;
 
 import java.lang.annotation.Annotation;
+import java.util.Map;
 import java.util.Optional;
 
 public interface Metadatable {
@@ -10,4 +11,6 @@ public interface Metadatable {
     {
         return getMetadata(type).isPresent();
     }
+
+    public Map<Class<?>, Annotation> getMetadataMap();
 }

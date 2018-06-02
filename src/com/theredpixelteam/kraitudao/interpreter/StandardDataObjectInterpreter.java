@@ -105,8 +105,9 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
                         valueObjectContainer.name = name;
                         valueObjectContainer.secondaryKey = true;
                         valueObjectContainer.owner = dataObject;
+                        valueObjectContainer.metadata = entry.getMetadataMap();
 
-                        mergeExpandRules(dataObject, secondaryKey, valueObjectContainer, entry);
+                        expand(dataObject, secondaryKey, valueObjectContainer, entry);
 
                         valueObjectContainer.seal();
 
@@ -139,8 +140,9 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
                     ValueObjectContainer valueObjectContainer = new ValueObjectContainer(dataObject.getType(), type, REFLECTION_COMPATIBLE_TYPES.get(type));
                     valueObjectContainer.name = name;
                     valueObjectContainer.owner = dataObject;
+                    valueObjectContainer.metadata = entry.getMetadataMap();
 
-                    mergeExpandRules(dataObject, value, valueObjectContainer, entry);
+                    expand(dataObject, value, valueObjectContainer, entry);
 
                     valueObjectContainer.seal();
 
@@ -151,7 +153,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         return dataObjectContainer;
     }
 
-    private static void mergeExpandRules(DataObject dataObject,
+    private static void expand(DataObject dataObject,
                                          ValueObject origin,
                                          ValueObjectContainer valueObjectContainer,
                                          ExpandRule.Entry entry)
@@ -649,7 +651,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
 
                     if(collectionInfo != null)
                         try {
-                            annos = (List) Arrays.asList((Object[]) collectionInfo.annotationType().getMethod("value").invoke(collectionInfo));
+                            annos = (List) Arrays.asList((Object[]) collectionInfo.annotationType().getMethod("value").invoke(anno));
                         } catch (Exception e) {
                             throw new DataObjectMalformationException(String.format(
                                     "Failed to unpack the metadata collection of %s (Type: %s)",
@@ -1434,6 +1436,12 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             return Optional.ofNullable((T) metadata.get(type));
         }
 
+        @Override
+        public Map<Class<?>, Annotation> getMetadataMap()
+        {
+            return Collections.unmodifiableMap(metadata);
+        }
+
         final Class<?> ownerType;
 
         String name;
@@ -1591,8 +1599,6 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             if(this.setterInfo == null)
                 throw new DataObjectMalformationException("Setter info undefined");
 
-            this.metadata = Collections.unmodifiableMap(metadata);
-
             this.sealed = true;
         }
 
@@ -1624,6 +1630,12 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         public <T extends Annotation> Optional<T> getMetadata(Class<T> type)
         {
             return Optional.ofNullable((T) metadata.get(type));
+        }
+
+        @Override
+        public Map<Class<?>, Annotation> getMetadataMap()
+        {
+            return Collections.unmodifiableMap(metadata);
         }
 
         ExpandRule.At getterInfo;

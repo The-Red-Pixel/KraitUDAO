@@ -103,6 +103,12 @@ public final class DataSourceUtil {
             return this.object.removeVaguely(transition, object);
         }
 
+        @Override
+        public void waitForTransaction()
+        {
+            this.object.waitForTransaction();
+        }
+
         private final DataSource object;
 
         private class SynchronizedTransaction implements Transaction

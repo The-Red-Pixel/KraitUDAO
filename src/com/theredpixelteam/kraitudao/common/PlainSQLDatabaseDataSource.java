@@ -205,6 +205,8 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
         stmt.append(constraint).append(")");
 
+        System.out.println(stmt.toString());
+
         PreparedStatement preparedStatement = connection.prepareStatement(stmt.toString());
         int n = preparedStatement.executeUpdate();
 
