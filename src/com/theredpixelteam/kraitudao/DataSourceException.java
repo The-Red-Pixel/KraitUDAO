@@ -28,4 +28,26 @@ public class DataSourceException extends Exception {
     {
         super(msg, cause);
     }
+
+    public static class DataSourceBusyException extends DataSourceException
+    {
+        public DataSourceBusyException()
+        {
+        }
+
+        public DataSourceBusyException(String msg)
+        {
+            super(msg);
+        }
+
+        public DataSourceBusyException(Throwable cause)
+        {
+            super(cause);
+        }
+
+        public DataSourceBusyException(String msg, Throwable cause)
+        {
+            super(msg, cause);
+        }
+    }
 }

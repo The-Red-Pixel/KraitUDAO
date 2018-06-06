@@ -132,9 +132,10 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         return null;
     }
 
-    private void checkTransaction(Transaction transaction)
+    private void checkTransaction(Transaction transaction) throws DataSourceException
     {
-
+        if(!transaction.equals(this.currentTransaction))
+            throw new DataSourceException.DataSourceBusyException();
     }
 
     @Override
@@ -154,20 +155,66 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         return createTable(conection, tableName, container.interpretIfAbsent(dataType, interpreter));
     }
 
-    public static int createTable(Connection connection, String tableName, DataObject dataObject) throws SQLException
+    public static int createTable(Connection connection,
+                                  String tableName,
+                                  DataObject dataObject) throws SQLException
     {
         return createTable0(connection, "CREATE TABLE " + tableName, dataObject);
     }
 
-    public int createTableIfNotExists(Connection connection, String tableName, Class<?> dataType)
+    public static int createTable(Connection connection,
+                                  String tableName,
+                                  Class<?> dataType,
+                                  DataObjectContainer container,
+                                  DataObjectInterpreter interpreter)
             throws SQLException, DataObjectInterpretationException
     {
         return createTable(connection, tableName, container.interpretIfAbsent(dataType, interpreter));
     }
 
-    public static int createTableIfNotExists(Connection connection, String tableName, DataObject dataObject) throws SQLException
+    public int createTable(Connection connection,
+                           DataObject dataObject)
+            throws SQLException
+    {
+        return createTable(connection, tableName, dataObject);
+    }
+
+    public int createTable(Connection connection,
+                           Class<?> dataType)
+            throws SQLException, DataObjectInterpretationException
+    {
+        return createTable(connection, tableName, container.interpretIfAbsent(dataType, interpreter));
+    }
+
+    public int createTableIfNotExists(Connection connection,
+                                      Class<?> dataType)
+            throws SQLException, DataObjectInterpretationException
+    {
+        return createTableIfNotExists(connection, tableName, container.interpretIfAbsent(dataType, interpreter));
+    }
+
+    public int createTableIfNotExists(Connection connection,
+                                      DataObject dataObject)
+            throws SQLException
+    {
+        return createTableIfNotExists(connection, tableName, dataObject);
+    }
+
+    public static int createTableIfNotExists(Connection connection,
+                                             String tableName,
+                                             DataObject dataObject) throws SQLException
     {
         return createTable0(connection, "CREATE TABLE IF NOT EXISTS " + tableName, dataObject);
+    }
+
+    public static int createTableIfNotExists(Connection connection,
+                                             String tableName,
+                                             Class<?> dataType,
+                                             DataObjectContainer container,
+                                             DataObjectInterpreter interpreter)
+            throws SQLException, DataObjectInterpretationException
+    {
+        return createTableIfNotExists(connection, tableName, container.interpretIfAbsent(dataType, interpreter));
     }
 
     private static int createTable0(Connection connection, String statement, DataObject dataObject) throws SQLException
