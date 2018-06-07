@@ -21,6 +21,59 @@
 
 package com.theredpixelteam.kraitudao.common.sql;
 
-public interface DatabaseManipulator {
+import com.theredpixelteam.kraitudao.dataobject.DataObject;
+import com.theredpixelteam.kraitudao.dataobject.DataObjectContainer;
+import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
+import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
+import com.theredpixelteam.redtea.util.Pair;
 
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+public interface DatabaseManipulator {
+    public ResultSet query(Connection connection,
+                           String tableName,
+                           Pair<String, DataArgument>[] keys, String[] values)
+            throws SQLException;
+
+    public int delete(Connection connection,
+                      String tableName,
+                      Pair<String, DataArgument>[] keysAndValues)
+            throws SQLException;
+
+    public int insert(Connection connection,
+                      String tableName,
+                      Pair<String, DataArgument>[] values)
+            throws SQLException;
+
+    public void createTable(Connection connection,
+                            String tableName,
+                            DataObject dataObject)
+            throws SQLException;
+
+    public default void createTable(Connection connection,
+                                    String tableName,
+                                    Class<?> dataType,
+                                    DataObjectContainer container,
+                                    DataObjectInterpreter interpreter)
+            throws SQLException, DataObjectInterpretationException
+    {
+        createTable(connection, tableName, container.interpretIfAbsent(dataType, interpreter));
+    }
+
+    public boolean createTableIfNotExists(Connection connection,
+                                          String tableName,
+                                          DataObject dataObject)
+            throws SQLException;
+
+    public default boolean createTableIfNotExists(Connection connection,
+                                                  String tableName,
+                                                  Class<?> dataType,
+                                                  DataObjectContainer container,
+                                                  DataObjectInterpreter interpreter)
+            throws SQLException, DataObjectInterpretationException
+    {
+        return createTableIfNotExists(connection, tableName, container.interpretIfAbsent(dataType, interpreter));
+    }
 }

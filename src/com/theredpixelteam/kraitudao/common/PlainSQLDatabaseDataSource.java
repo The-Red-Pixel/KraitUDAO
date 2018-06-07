@@ -27,6 +27,7 @@ import com.theredpixelteam.kraitudao.Transaction;
 import com.theredpixelteam.kraitudao.annotations.metadata.common.NotNull;
 import com.theredpixelteam.kraitudao.annotations.metadata.common.Precision;
 import com.theredpixelteam.kraitudao.annotations.metadata.common.Size;
+import com.theredpixelteam.kraitudao.common.sql.DatabaseManipulator;
 import com.theredpixelteam.kraitudao.dataobject.*;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
@@ -34,6 +35,7 @@ import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.*;
@@ -145,11 +147,6 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     {
         if(!transaction.equals(this.currentTransaction))
             throw new DataSourceException.DataSourceBusyException();
-    }
-
-    private <T> Collection<T> query(Class<T> dataType, List<ValueObject> keys, List<ValueObject> values)
-    {
-
     }
 
     @Override
@@ -291,6 +288,16 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         return n;
     }
 
+    public DatabaseManipulator getManipulator()
+    {
+        return manipulator;
+    }
+
+    public void setManipulator(DatabaseManipulator manipulator)
+    {
+        this.manipulator = Objects.requireNonNull(manipulator);
+    }
+
     private static void appendTableElement(StringBuilder stmt, ValueObject valueObject)
     {
         Class<?> type = tryToUnbox(valueObject.getType());
@@ -333,6 +340,8 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     protected DataObjectInterpreter interpreter;
 
     protected final DataObjectContainer container;
+
+    protected DatabaseManipulator manipulator;
 
     protected static final Map<Class<?>, DataObject> CACHE = new HashMap<>();
 
