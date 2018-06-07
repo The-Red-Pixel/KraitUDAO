@@ -155,137 +155,38 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         while(this.currentTransaction != null);
     }
 
-    public static Optional<String> getSQLType(Class<?> type)
-    {
-        return Optional.ofNullable(MAPPING.get(type));
-    }
-
-    public int createTable(Connection conection, String tableName, Class<?> dataType)
+    public void createTable(Connection conection, String tableName, Class<?> dataType)
             throws SQLException, DataObjectInterpretationException
     {
-        return createTable(conection, tableName, container.interpretIfAbsent(dataType, interpreter));
+        manipulator.createTable(conection, tableName, dataType, container, interpreter);
     }
 
-    public static int createTable(Connection connection,
-                                  String tableName,
-                                  DataObject dataObject) throws SQLException
-    {
-        return createTable0(connection, "CREATE TABLE " + tableName, dataObject);
-    }
-
-    public static int createTable(Connection connection,
-                                  String tableName,
-                                  Class<?> dataType,
-                                  DataObjectContainer container,
-                                  DataObjectInterpreter interpreter)
-            throws SQLException, DataObjectInterpretationException
-    {
-        return createTable(connection, tableName, container.interpretIfAbsent(dataType, interpreter));
-    }
-
-    public int createTable(Connection connection,
+    public void createTable(Connection connection,
                            DataObject dataObject)
             throws SQLException
     {
-        return createTable(connection, tableName, dataObject);
+        manipulator.createTable(connection, tableName, dataObject);
     }
 
-    public int createTable(Connection connection,
+    public void createTable(Connection connection,
                            Class<?> dataType)
             throws SQLException, DataObjectInterpretationException
     {
-        return createTable(connection, tableName, container.interpretIfAbsent(dataType, interpreter));
+        manipulator.createTable(connection, tableName, dataType, container, interpreter);
     }
 
-    public int createTableIfNotExists(Connection connection,
+    public boolean createTableIfNotExists(Connection connection,
                                       Class<?> dataType)
             throws SQLException, DataObjectInterpretationException
     {
-        return createTableIfNotExists(connection, tableName, container.interpretIfAbsent(dataType, interpreter));
+        return manipulator.createTableIfNotExists(connection, tableName, dataType, container, interpreter);
     }
 
-    public int createTableIfNotExists(Connection connection,
+    public boolean createTableIfNotExists(Connection connection,
                                       DataObject dataObject)
             throws SQLException
     {
-        return createTableIfNotExists(connection, tableName, dataObject);
-    }
-
-    public static int createTableIfNotExists(Connection connection,
-                                             String tableName,
-                                             DataObject dataObject) throws SQLException
-    {
-        return createTable0(connection, "CREATE TABLE IF NOT EXISTS " + tableName, dataObject);
-    }
-
-    public static int createTableIfNotExists(Connection connection,
-                                             String tableName,
-                                             Class<?> dataType,
-                                             DataObjectContainer container,
-                                             DataObjectInterpreter interpreter)
-            throws SQLException, DataObjectInterpretationException
-    {
-        return createTableIfNotExists(connection, tableName, container.interpretIfAbsent(dataType, interpreter));
-    }
-
-    private static int createTable0(Connection connection, String statement, DataObject dataObject) throws SQLException
-    {
-        StringBuilder stmt = new StringBuilder(statement).append(" (");
-        StringBuilder constraint = new StringBuilder();
-
-        if(dataObject instanceof UniqueDataObject)
-        {
-            UniqueDataObject uniqueDataObject = (UniqueDataObject) dataObject;
-            ValueObject key = uniqueDataObject.getKey();
-
-            appendTableElement(stmt, key);
-
-            constraint.append(String.format("CONSTRAINT CONSTRAINT_KEY PRIMARY KEY (%s)",
-                    key.getName()));
-        }
-        else if(dataObject instanceof MultipleDataObject)
-        {
-            MultipleDataObject multipleDataObject = (MultipleDataObject) dataObject;
-            ValueObject primaryKey = multipleDataObject.getPrimaryKey();
-
-            appendTableElement(stmt, primaryKey);
-
-
-            constraint.append(
-                            String.format("CONSTRAINT CONSTRAINT_PRIMARY_KEY PRIMARY KEY (%s)",
-                                    primaryKey.getName()))
-                    .append("CONSTRAINT CONSTRAINT_SECONDARY_KEYS SECONDARY KEY (");
-
-            Collection<ValueObject> valueObjectCollection = multipleDataObject.getSecondaryKeys().values();
-            int valueObjectCollectionSize = valueObjectCollection.size(), i = 0;
-            for(ValueObject secondaryKey : multipleDataObject.getSecondaryKeys().values())
-            {
-                appendTableElement(stmt, secondaryKey);
-
-                constraint.append(secondaryKey.getName());
-
-                if(++i < valueObjectCollectionSize)
-                    constraint.append(",");
-            }
-
-            constraint.append(")");
-        }
-        else
-            throw new DataObjectException("Illegal or unsupported data object type");
-
-        for(ValueObject valueObject : dataObject.getValues().values())
-            appendTableElement(stmt, valueObject);
-
-        stmt.append(constraint).append(")");
-
-        System.out.println(stmt.toString());
-
-        PreparedStatement preparedStatement = connection.prepareStatement(stmt.toString());
-        int n = preparedStatement.executeUpdate();
-
-        preparedStatement.close();
-
-        return n;
+        return manipulator.createTableIfNotExists(connection, tableName, dataObject);
     }
 
     public DatabaseManipulator getManipulator()
@@ -296,39 +197,6 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     public void setManipulator(DatabaseManipulator manipulator)
     {
         this.manipulator = Objects.requireNonNull(manipulator);
-    }
-
-    private static void appendTableElement(StringBuilder stmt, ValueObject valueObject)
-    {
-        Class<?> type = tryToUnbox(valueObject.getType());
-        String typeString = MAPPING.get(type);
-
-        if(typeString == null)
-            throw new DataObjectException("Unsupported type: " + type.getCanonicalName() + " (PLEASE Try to use expandable value)");
-
-        TypeDecorator typeDecorator = TYPE_DECORATORS.get(type);
-        if(typeDecorator != null)
-            typeString = typeDecorator.decorate(typeString, valueObject);
-
-        stmt.append(String.format(typeString, valueObject.getName())).append(",");
-    }
-
-    private static Class<?> tryToUnbox(Class<?> type)
-    {
-        Class<?> unboxed = BOXING.get(type);
-
-        return unboxed == null ? type : unboxed;
-    }
-
-    private static TypeDecorator of(TypeDecorator... decorators)
-    {
-        final TypeDecorator[] sequence = decorators;
-        return (type, valueObject) -> {
-            for(TypeDecorator decorator : sequence)
-                type = decorator.decorate(type, valueObject);
-
-            return type;
-        };
     }
 
     private volatile Transaction currentTransaction;
@@ -344,94 +212,6 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     protected DatabaseManipulator manipulator;
 
     protected static final Map<Class<?>, DataObject> CACHE = new HashMap<>();
-
-    private static final Map<Class<?>, Class<?>> BOXING = new HashMap<Class<?>, Class<?>>() {
-        {
-            //  Boxed type       |  Unboxed type
-            put(Boolean.class,      boolean.class);
-            put(Character.class,    char.class);
-            put(Short.class,        short.class);
-            put(Integer.class,      int.class);
-            put(Long.class,         long.class);
-            put(Float.class,        float.class);
-            put(Double.class,       double.class);
-        }
-    };
-
-    private static final Map<Class<?>, String> MAPPING = new HashMap<Class<?>, String>() {
-        {
-            //  Java type        |  SQL type
-            put(boolean.class,      "BOOLEAN");
-            put(byte.class,         "BINARY(1)");
-            put(char.class,         "NCHAR(1)");
-            put(short.class,        "SMALLINT");
-            put(int.class,          "INTEGER");
-            put(long.class,         "BIGINT");
-            put(float.class,        "FLOAT");
-            put(double.class,       "DOUBLE");
-            put(String.class,       "NVARCHAR");
-            put(BigDecimal.class,   "DECIMAL");
-            put(BigInteger.class,   "BIGINT");
-        }
-    };
-
-    private static final Map<Class<?>, TypeDecorator> TYPE_DECORATORS = new HashMap<Class<?>, TypeDecorator>() {
-        {
-            TypeDecorator notNullDecorator = (type, valueObject) -> {
-                Optional<NotNull> metadata = valueObject.getMetadata(NotNull.class);
-
-                if(!metadata.isPresent())
-                    return type;
-                else
-                    return type + " NOT NULL";
-            };
-
-            TypeDecorator placer = (type, valueObject) -> type + " %s";
-
-            TypeDecorator integerPrecisionDecorator = of((type, valueObject) -> {
-                Optional<Precision> metadata = valueObject.getMetadata(Precision.class);
-
-                if(!metadata.isPresent())
-                    return type;
-                else
-                    return type + "(" + metadata.get().integer() + ")";
-            }, placer, notNullDecorator);
-
-            TypeDecorator decimalPrecisionDecorator = of((type, valueObject) -> {
-                Optional<Precision> metadata = valueObject.getMetadata(Precision.class);
-
-                if(!metadata.isPresent())
-                    return type;
-
-                Precision precision = metadata.get();
-
-                return type + "(" + precision.integer() + "," + precision.decimal() + ")";
-            }, placer, notNullDecorator);
-
-            put(String.class, of((type, valueObject) -> {
-                Optional<Size> metadata = valueObject.getMetadata(Size.class);
-
-                if(!metadata.isPresent())
-                    return type;
-                else
-                    return type + "(" + metadata.get().value() + ")";
-            }, placer, notNullDecorator));
-
-            put(short.class, integerPrecisionDecorator);
-            put(int.class, integerPrecisionDecorator);
-            put(long.class, integerPrecisionDecorator);
-            put(BigInteger.class, integerPrecisionDecorator);
-
-            put(float.class, decimalPrecisionDecorator);
-            put(double.class, decimalPrecisionDecorator);
-            put(BigDecimal.class, decimalPrecisionDecorator);
-        }
-    };
-
-    private interface TypeDecorator
-    {
-        String decorate(String type, ValueObject valueObject);
-    }
 
     private class TransactionImpl implements Transaction
     {
