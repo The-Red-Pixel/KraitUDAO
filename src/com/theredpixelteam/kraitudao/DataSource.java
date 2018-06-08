@@ -36,13 +36,6 @@ public interface DataSource {
 
     public <T> Collection<T> pullVaguely(T object) throws DataSourceException;
 
-    public default Transaction commit(Collection<Object> objects) throws DataSourceException
-    {
-        return commit(null, objects);
-    }
-
-    public Transaction commit(Transaction transition, Collection<Object> objects) throws DataSourceException;
-
     public default <T> Transaction commit(T object, Class<T> type) throws DataSourceException
     {
         return commit(null, object, type);

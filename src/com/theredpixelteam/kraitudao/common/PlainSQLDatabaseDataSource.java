@@ -96,19 +96,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     }
 
     @Override
-    public Transaction commit(Transaction transition, Collection<Object> objects) throws DataSourceException
-    {
-        return null;
-    }
-
-    @Override
     public <T> Transaction commit(Transaction transition, T object, Class<T> type) throws DataSourceException
-    {
-        return null;
-    }
-
-    @Override
-    public <T> Transaction remove(T object) throws DataSourceException
     {
         return null;
     }
@@ -120,19 +108,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     }
 
     @Override
-    public <T> Transaction clear() throws DataSourceException
-    {
-        return null;
-    }
-
-    @Override
     public <T> Transaction clear(Transaction transition) throws DataSourceException
-    {
-        return null;
-    }
-
-    @Override
-    public <T> Transaction removeVaguely(T object) throws DataSourceException
     {
         return null;
     }
@@ -145,7 +121,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
     private void checkTransaction(Transaction transaction) throws DataSourceException
     {
-        if(!transaction.equals(this.currentTransaction))
+        if((transaction == null && this.currentTransaction != null) || !transaction.equals(this.currentTransaction))
             throw new DataSourceException.DataSourceBusyException();
     }
 
