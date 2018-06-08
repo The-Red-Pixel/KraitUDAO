@@ -41,20 +41,49 @@ import java.util.Optional;
 public class DefaultDatabaseManipulator implements DatabaseManipulator {
     @Override
     public ResultSet query(Connection connection, String tableName, Pair<String, DataArgument>[] keys, String[] values)
-            throws SQLException {
-        return null;
+            throws SQLException
+    {
+        PreparedStatement preparedStatement = connection.prepareStatement(
+                "SELECT " + combine(values, ",", "*") +
+                        " FROM " + tableName +
+                        " WHERE " + narrow(keys));
+
+        for(int i = 0; i < keys.length;)
+            keys[i].second().set(preparedStatement, ++i);
+
+        return preparedStatement.executeQuery();
     }
 
     @Override
     public int delete(Connection connection, String tableName, Pair<String, DataArgument>[] keysAndValues)
-            throws SQLException {
-        return 0;
+            throws SQLException
+    {
+        PreparedStatement preparedStatement = connection.prepareStatement(
+                "DELETE FROM " + tableName +
+                        " WHERE " + narrow(keysAndValues));
+
+        for(int i = 0; i < keysAndValues.length;)
+            keysAndValues[i].second().set(preparedStatement, ++i);
+
+        return preparedStatement.executeUpdate();
     }
 
     @Override
     public int insert(Connection connection, String tableName, Pair<String, DataArgument>[] values)
-            throws SQLException {
-        return 0;
+            throws SQLException
+    {
+        if(values == null || values.length == 0)
+            return 0;
+
+        PreparedStatement preparedStatement = connection.prepareStatement(
+                "MERGE INTO " + tableName +
+                        " KEY (" + combine(values, ",", null) + ")" +
+                        " VALUES (" + arguments(values.length) + ")");
+
+        for(int i = 0; i < values.length;)
+            values[i].second().set(preparedStatement, ++i);
+
+        return preparedStatement.executeUpdate();
     }
 
     @Override
@@ -81,8 +110,7 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
 
             appendTableElement(stmt, key);
 
-            constraint.append(String.format("CONSTRAINT CONSTRAINT_KEY PRIMARY KEY (%s)",
-                    key.getName()));
+            constraint.append("CONSTRAINT CONSTRAINT_KEY PRIMARY KEY (").append(key.getName()).append(")");
         }
         else if(dataObject instanceof MultipleDataObject)
         {
@@ -92,9 +120,7 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
             appendTableElement(stmt, primaryKey);
 
 
-            constraint.append(
-                    String.format("CONSTRAINT CONSTRAINT_PRIMARY_KEY PRIMARY KEY (%s)",
-                            primaryKey.getName()))
+            constraint.append("CONSTRAINT CONSTRAINT_PRIMARY_KEY PRIMARY KEY (").append(primaryKey.getName()).append(")")
                     .append("CONSTRAINT CONSTRAINT_SECONDARY_KEYS SECONDARY KEY (");
 
             Collection<ValueObject> valueObjectCollection = multipleDataObject.getSecondaryKeys().values();
@@ -159,8 +185,56 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
         if(typeDecorator != null)
             typeString = typeDecorator.decorate(typeString, valueObject);
 
-        stmt.append(String.format(typeString, valueObject.getName())).append(",");
+        stmt.append(valueObject.getName()).append(" ").append(typeString).append(",");
     }
+
+    protected static String arguments(int count)
+    {
+        count -= 1;
+
+        StringBuilder str = new StringBuilder();
+
+        for(int i = 0; i < count; i++)
+            str.append("?,");
+        str.append("?");
+
+        return str.toString();
+    }
+
+    protected static String combine(Object[] objs, String connector, String orElse)
+    {
+        return combine(objs, connector, "", orElse);
+    }
+
+    protected static String combine(Object[] objs, String connector, String lastConnector, String orElse)
+    {
+        if(objs == null || objs.length == 0)
+            return orElse;
+
+        StringBuilder str = new StringBuilder();
+
+        for(int i = 0; i < objs.length - 1; i++)
+            str.append(objs[i].toString()).append(connector);
+        str.append(objs[objs.length - 1].toString()).append(lastConnector);
+
+        return str.toString();
+    }
+
+    protected static String narrow(Pair<String, ?>[] narrows)
+    {
+        if(narrows == null || narrows.length == 0)
+            return "TRUE";
+
+        StringBuilder stmt = new StringBuilder();
+
+        for(int i = 0; i < narrows.length - 1; i++)
+            stmt.append(narrows[i].first()).append("=? AND ");
+        stmt.append(narrows[narrows.length - 1].first()).append("=?");
+
+        return stmt.toString();
+    }
+
+    public static final DatabaseManipulator INSTANCE = new DefaultDatabaseManipulator();
 
     private static final Map<Class<?>, Class<?>> BOXING = new HashMap<Class<?>, Class<?>>() {
         {
@@ -203,8 +277,6 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
                     return type + " NOT NULL";
             };
 
-            TypeDecorator placer = (type, valueObject) -> type + " %s";
-
             TypeDecorator integerPrecisionDecorator = of((type, valueObject) -> {
                 Optional<Precision> metadata = valueObject.getMetadata(Precision.class);
 
@@ -212,7 +284,7 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
                     return type;
                 else
                     return type + "(" + metadata.get().integer() + ")";
-            }, placer, notNullDecorator);
+            }, notNullDecorator);
 
             TypeDecorator decimalPrecisionDecorator = of((type, valueObject) -> {
                 Optional<Precision> metadata = valueObject.getMetadata(Precision.class);
@@ -223,7 +295,7 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
                 Precision precision = metadata.get();
 
                 return type + "(" + precision.integer() + "," + precision.decimal() + ")";
-            }, placer, notNullDecorator);
+            }, notNullDecorator);
 
             put(String.class, of((type, valueObject) -> {
                 Optional<Size> metadata = valueObject.getMetadata(Size.class);
@@ -232,7 +304,7 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
                     return type;
                 else
                     return type + "(" + metadata.get().value() + ")";
-            }, placer, notNullDecorator));
+            }, notNullDecorator));
 
             put(short.class, integerPrecisionDecorator);
             put(int.class, integerPrecisionDecorator);
