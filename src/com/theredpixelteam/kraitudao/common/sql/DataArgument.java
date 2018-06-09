@@ -22,7 +22,8 @@
 package com.theredpixelteam.kraitudao.common.sql;
 
 import java.sql.PreparedStatement;
+import java.sql.SQLException;
 
 public interface DataArgument {
-    public void set(PreparedStatement preparedStatement, int index);
+    public void apply(PreparedStatement preparedStatement, int index) throws SQLException;
 }

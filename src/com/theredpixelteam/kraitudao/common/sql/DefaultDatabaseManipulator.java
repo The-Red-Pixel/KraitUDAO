@@ -49,9 +49,13 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
                         " WHERE " + narrow(keys));
 
         for(int i = 0; i < keys.length;)
-            keys[i].second().set(preparedStatement, ++i);
+            keys[i].second().apply(preparedStatement, ++i);
 
-        return preparedStatement.executeQuery();
+        ResultSet result = preparedStatement.executeQuery();
+
+        preparedStatement.close();
+
+        return result;
     }
 
     @Override
@@ -63,9 +67,13 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
                         " WHERE " + narrow(keysAndValues));
 
         for(int i = 0; i < keysAndValues.length;)
-            keysAndValues[i].second().set(preparedStatement, ++i);
+            keysAndValues[i].second().apply(preparedStatement, ++i);
 
-        return preparedStatement.executeUpdate();
+        int n = preparedStatement.executeUpdate();
+
+        preparedStatement.close();
+
+        return n;
     }
 
     @Override
@@ -81,9 +89,13 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
                         " VALUES (" + arguments(values.length) + ")");
 
         for(int i = 0; i < values.length;)
-            values[i].second().set(preparedStatement, ++i);
+            values[i].second().apply(preparedStatement, ++i);
 
-        return preparedStatement.executeUpdate();
+        int n = preparedStatement.executeUpdate();
+
+        preparedStatement.close();
+
+        return n;
     }
 
     @Override
@@ -262,7 +274,6 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
             put(double.class,       "DOUBLE");
             put(String.class,       "NVARCHAR");
             put(BigDecimal.class,   "DECIMAL");
-            put(BigInteger.class,   "BIGINT");
         }
     };
 
@@ -309,7 +320,6 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
             put(short.class, integerPrecisionDecorator);
             put(int.class, integerPrecisionDecorator);
             put(long.class, integerPrecisionDecorator);
-            put(BigInteger.class, integerPrecisionDecorator);
 
             put(float.class, decimalPrecisionDecorator);
             put(double.class, decimalPrecisionDecorator);

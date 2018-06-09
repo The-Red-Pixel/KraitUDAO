@@ -31,6 +31,7 @@ import com.theredpixelteam.kraitudao.common.sql.DatabaseManipulator;
 import com.theredpixelteam.kraitudao.dataobject.*;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
+import com.theredpixelteam.kraitudao.interpreter.StandardDataObjectInterpreter;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -65,6 +66,13 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             throws DataSourceException
     {
         this(connection, tableName, interpreter, DataObjectCache.getGlobal());
+    }
+
+    public PlainSQLDatabaseDataSource(Connection connection,
+                                      String tableName)
+            throws DataSourceException
+    {
+        this(connection, tableName, StandardDataObjectInterpreter.INSTANCE, DataObjectCache.getGlobal());
     }
 
     public Connection getConnection()

@@ -1065,6 +1065,8 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
 
     private final Map<Class<?>, ExpandRule> bulitInRules;
 
+    public static final StandardDataObjectInterpreter INSTANCE = new StandardDataObjectInterpreter();
+
     private static final MultiCondition<AnnotatedElement, Class<?>> annotationCondition =
             MultiCondition.of(MultiPredicate.<AnnotatedElement, Class<?>>builder()
                     .next(a(Unique.class))
