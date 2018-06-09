@@ -64,18 +64,6 @@ public final class DataSourceUtil {
         }
 
         @Override
-        public synchronized Transaction commit(Collection<Object> objects) throws DataSourceException
-        {
-            return new SynchronizedTransaction(this.object.commit(objects));
-        }
-
-        @Override
-        public synchronized Transaction commit(Transaction transition, Collection<Object> objects) throws DataSourceException
-        {
-            return this.object.commit(transition, objects);
-        }
-
-        @Override
         public synchronized <T> Transaction commit(T object, Class<T> type) throws DataSourceException
         {
             return new SynchronizedTransaction(this.object.commit(object, type));
