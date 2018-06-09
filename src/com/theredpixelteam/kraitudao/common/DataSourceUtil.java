@@ -24,6 +24,7 @@ package com.theredpixelteam.kraitudao.common;
 import com.theredpixelteam.kraitudao.DataSource;
 import com.theredpixelteam.kraitudao.DataSourceException;
 import com.theredpixelteam.kraitudao.Transaction;
+import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
 
 import java.util.Collection;
 import java.util.Optional;
@@ -46,43 +47,50 @@ public final class DataSourceUtil {
         }
 
         @Override
-        public synchronized <T> void pull(T object, Class<T> type) throws DataSourceException
+        public synchronized <T> void pull(T object, Class<T> type)
+                throws DataSourceException, DataObjectInterpretationException
         {
             this.object.pull(object, type);
         }
 
         @Override
-        public synchronized <T> Collection<T> pull(Class<T> type) throws DataSourceException
+        public synchronized <T> Collection<T> pull(Class<T> type)
+                throws DataSourceException, DataObjectInterpretationException
         {
             return this.object.pull(type);
         }
 
         @Override
-        public synchronized <T> Collection<T> pullVaguely(T object) throws DataSourceException
+        public synchronized <T> Collection<T> pullVaguely(T object)
+                throws DataSourceException, DataObjectInterpretationException
         {
             return this.object.pullVaguely(object);
         }
 
         @Override
-        public synchronized <T> Transaction commit(T object, Class<T> type) throws DataSourceException
+        public synchronized <T> Transaction commit(T object, Class<T> type)
+                throws DataSourceException, DataObjectInterpretationException
         {
             return new SynchronizedTransaction(this.object.commit(object, type));
         }
 
         @Override
-        public synchronized <T> Transaction commit(Transaction transition, T object, Class<T> type) throws DataSourceException
+        public synchronized <T> Transaction commit(Transaction transition, T object, Class<T> type)
+                throws DataSourceException, DataObjectInterpretationException
         {
             return this.object.commit(transition, object, type);
         }
 
         @Override
-        public synchronized <T> Transaction remove(T object) throws DataSourceException
+        public synchronized <T> Transaction remove(T object)
+                throws DataSourceException, DataObjectInterpretationException
         {
             return new SynchronizedTransaction(this.object.remove(object));
         }
 
         @Override
-        public synchronized <T> Transaction remove(Transaction transition, T object) throws DataSourceException
+        public synchronized <T> Transaction remove(Transaction transition, T object)
+                throws DataSourceException, DataObjectInterpretationException
         {
             return this.object.remove(transition, object);
         }
@@ -100,13 +108,15 @@ public final class DataSourceUtil {
         }
 
         @Override
-        public synchronized <T> Transaction removeVaguely(T object) throws DataSourceException
+        public synchronized <T> Transaction removeVaguely(T object)
+                throws DataSourceException, DataObjectInterpretationException
         {
             return new SynchronizedTransaction(this.object.removeVaguely(object));
         }
 
         @Override
-        public synchronized <T> Transaction removeVaguely(Transaction transition, T object) throws DataSourceException
+        public synchronized <T> Transaction removeVaguely(Transaction transition, T object)
+                throws DataSourceException, DataObjectInterpretationException
         {
             return this.object.removeVaguely(transition, object);
         }
