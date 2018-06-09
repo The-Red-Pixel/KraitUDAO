@@ -41,23 +41,45 @@ public class DataSourceException extends Exception {
         super(msg, cause);
     }
 
-    public static class DataSourceBusyException extends DataSourceException
+    public static class Busy extends DataSourceException
     {
-        public DataSourceBusyException()
+        public Busy()
         {
         }
 
-        public DataSourceBusyException(String msg)
+        public Busy(String msg)
         {
             super(msg);
         }
 
-        public DataSourceBusyException(Throwable cause)
+        public Busy(Throwable cause)
         {
             super(cause);
         }
 
-        public DataSourceBusyException(String msg, Throwable cause)
+        public Busy(String msg, Throwable cause)
+        {
+            super(msg, cause);
+        }
+    }
+
+    public static class UnsupportedValueType extends DataSourceException
+    {
+        public UnsupportedValueType()
+        {
+        }
+
+        public UnsupportedValueType(String msg)
+        {
+            super(msg);
+        }
+
+        public UnsupportedValueType(Throwable cause)
+        {
+            super(cause);
+        }
+
+        public UnsupportedValueType(String msg, Throwable cause)
         {
             super(msg, cause);
         }

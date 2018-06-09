@@ -40,4 +40,26 @@ public class DataObjectMalformationException extends DataObjectInterpretationExc
     {
         super(msg, cause);
     }
+
+    public static class IllegalType extends DataObjectMalformationException
+    {
+        public IllegalType()
+        {
+        }
+
+        public IllegalType(String msg)
+        {
+            super(msg);
+        }
+
+        public IllegalType(Throwable cause)
+        {
+            super(cause);
+        }
+
+        public IllegalType(String msg, Throwable cause)
+        {
+            super(msg, cause);
+        }
+    }
 }

@@ -144,7 +144,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             dataObjectContainer.putKey(KeyType.UNIQUE, uniqueDataObject.getKey());
         }
         else
-            throw new DataObjectMalformationException("Illegal type of data object");
+            throw new DataObjectMalformationException.IllegalType();
 
         for(ValueObject value : dataObject.getValues().values())
             if(!value.getExpandRule().isPresent())

@@ -21,34 +21,36 @@
 
 package com.theredpixelteam.kraitudao;
 
+import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
+
 import java.util.Collection;
 
 @SuppressWarnings("unchecked")
 public interface DataSource {
-    public default void pull(Object object) throws DataSourceException
+    public default void pull(Object object) throws DataSourceException, DataObjectInterpretationException
     {
         pull(object, (Class) object.getClass());
     }
 
-    public <T> void pull(T object, Class<T> type) throws DataSourceException;
+    public <T> void pull(T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException;
 
-    public <T> Collection<T> pull(Class<T> type) throws DataSourceException;
+    public <T> Collection<T> pull(Class<T> type) throws DataSourceException, DataObjectInterpretationException;
 
-    public <T> Collection<T> pullVaguely(T object) throws DataSourceException;
+    public <T> Collection<T> pullVaguely(T object) throws DataSourceException, DataObjectInterpretationException;
 
-    public default <T> Transaction commit(T object, Class<T> type) throws DataSourceException
+    public default <T> Transaction commit(T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException
     {
         return commit(null, object, type);
     }
 
-    public <T> Transaction commit(Transaction transition, T object, Class<T> type) throws DataSourceException;
+    public <T> Transaction commit(Transaction transition, T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException;
 
-    public default <T> Transaction remove(T object) throws DataSourceException
+    public default <T> Transaction remove(T object) throws DataSourceException, DataObjectInterpretationException
     {
         return remove(null, object);
     }
 
-    public <T> Transaction remove(Transaction transition, T object) throws DataSourceException;
+    public <T> Transaction remove(Transaction transition, T object) throws DataSourceException, DataObjectInterpretationException;
 
     public default <T> Transaction clear() throws DataSourceException
     {
@@ -57,12 +59,12 @@ public interface DataSource {
 
     public <T> Transaction clear(Transaction transition) throws DataSourceException;
 
-    public default <T> Transaction removeVaguely(T object) throws DataSourceException
+    public default <T> Transaction removeVaguely(T object) throws DataSourceException, DataObjectInterpretationException
     {
         return removeVaguely(null, object);
     }
 
-    public <T> Transaction removeVaguely(Transaction transition, T object) throws DataSourceException;
+    public <T> Transaction removeVaguely(Transaction transition, T object) throws DataSourceException, DataObjectInterpretationException;
 
     public void waitForTransaction();
 }

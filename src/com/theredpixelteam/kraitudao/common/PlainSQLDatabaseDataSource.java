@@ -24,28 +24,28 @@ package com.theredpixelteam.kraitudao.common;
 import com.theredpixelteam.kraitudao.DataSource;
 import com.theredpixelteam.kraitudao.DataSourceException;
 import com.theredpixelteam.kraitudao.Transaction;
-import com.theredpixelteam.kraitudao.annotations.metadata.common.NotNull;
-import com.theredpixelteam.kraitudao.annotations.metadata.common.Precision;
-import com.theredpixelteam.kraitudao.annotations.metadata.common.Size;
+import com.theredpixelteam.kraitudao.common.sql.DataArgument;
+import com.theredpixelteam.kraitudao.common.sql.DataArgumentWrapper;
 import com.theredpixelteam.kraitudao.common.sql.DatabaseManipulator;
+import com.theredpixelteam.kraitudao.common.sql.DefaultDataArgumentWrapper;
 import com.theredpixelteam.kraitudao.dataobject.*;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
+import com.theredpixelteam.kraitudao.interpreter.DataObjectMalformationException;
 import com.theredpixelteam.kraitudao.interpreter.StandardDataObjectInterpreter;
+import com.theredpixelteam.redtea.util.Pair;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
 
 public class PlainSQLDatabaseDataSource implements DataSource {
     public PlainSQLDatabaseDataSource(Connection connection,
-                                   String tableName,
-                                   DataObjectInterpreter interpreter,
-                                   DataObjectContainer container)
+                                      String tableName,
+                                      DataObjectInterpreter interpreter,
+                                      DataObjectContainer container,
+                                      DataArgumentWrapper argumentWrapper)
             throws DataSourceException
     {
         this.connection = connection;
@@ -61,8 +61,17 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     }
 
     public PlainSQLDatabaseDataSource(Connection connection,
-                                   String tableName,
-                                   DataObjectInterpreter interpreter)
+                                      String tableName,
+                                      DataObjectInterpreter interpreter,
+                                      DataObjectContainer container)
+            throws DataSourceException
+    {
+        this(connection, tableName, interpreter, container, DefaultDataArgumentWrapper.INSTANCE);
+    }
+
+    public PlainSQLDatabaseDataSource(Connection connection,
+                                      String tableName,
+                                      DataObjectInterpreter interpreter)
             throws DataSourceException
     {
         this(connection, tableName, interpreter, DataObjectCache.getGlobal());
@@ -85,10 +94,84 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         return this.tableName;
     }
 
-    @Override
-    public <T> void pull(T object, Class<T> type) throws DataSourceException
+    private boolean putArgument0(List<Pair<String, DataArgument>> list, Object object, ValueObject valueObject, String msgOnNull, boolean nonNull)
+            throws DataSourceException
     {
+        Object value = valueObject.get(object);
 
+        if(value == null)
+            if(nonNull)
+                throw new DataSourceException(msgOnNull);
+            else
+                return false;
+        else
+            list.add(Pair.of(valueObject.getName(), argumentWrapper.wrap(object)
+                    .orElseThrow(() -> new DataSourceException.UnsupportedValueType(valueObject.getType().getCanonicalName()))));
+
+        return true;
+    }
+
+    private void putArgument(List<Pair<String, DataArgument>> list, Object object, ValueObject valueObject, String msgOnNull)
+            throws DataSourceException
+    {
+        putArgument0(list, object, valueObject, msgOnNull, true);
+    }
+
+    private boolean putArgumentIfNotNull(List<Pair<String, DataArgument>> list, Object object, ValueObject valueObject)
+            throws DataSourceException
+    {
+        return putArgument0(list, object, valueObject, null, false);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T> void pull(T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException
+    {
+        DataObject dataObject = container.interpretIfAbsent(type, interpreter);
+
+        List<Pair<String, DataArgument>> keys = new ArrayList<>();
+
+        if(dataObject instanceof UniqueDataObject)
+        {
+            UniqueDataObject uniqueDataObject = (UniqueDataObject) dataObject;
+            ValueObject key = uniqueDataObject.getKey();
+
+            putArgument(keys, object, key, "Null key");
+        }
+        else if(dataObject instanceof MultipleDataObject)
+        {
+            MultipleDataObject multipleDataObject = (MultipleDataObject) dataObject;
+            ValueObject primarykey = multipleDataObject.getPrimaryKey();
+            Collection<ValueObject> secondaryKeys = multipleDataObject.getSecondaryKeys().values();
+
+            putArgument(keys, object, primarykey, "Null primary key");
+            for(ValueObject secondaryKey : secondaryKeys)
+                putArgument(keys, object, secondaryKey, "Null secondary key");
+        }
+        else
+            throw new DataObjectMalformationException.IllegalType();
+
+        Map<String, ValueObject> values = dataObject.getValues();
+        Collection<String> valueNames = values.keySet();
+
+        Pair<String, DataArgument>[] keyArray = keys.toArray(new Pair[keys.size()]);
+        String[] nameArray = valueNames.toArray(new String[valueNames.size()]);
+
+        try {
+            ResultSet resultSet = manipulator.query(connection, tableName, keyArray, nameArray);
+
+            resultSet.last();
+
+            if(resultSet.getRow() != 1)
+                throw new DataSourceException("Multiple record found");
+
+            // for maximum compatibility
+            // TODO uncompleted
+
+            resultSet.close();
+        } catch (SQLException e) {
+            throw new DataSourceException("SQLException", e);
+        }
     }
 
     @Override
@@ -130,7 +213,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     private void checkTransaction(Transaction transaction) throws DataSourceException
     {
         if((transaction == null && this.currentTransaction != null) || !transaction.equals(this.currentTransaction))
-            throw new DataSourceException.DataSourceBusyException();
+            throw new DataSourceException.Busy();
     }
 
     @Override
@@ -183,6 +266,16 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         this.manipulator = Objects.requireNonNull(manipulator);
     }
 
+    public DataArgumentWrapper getArgumentWrapper()
+    {
+        return argumentWrapper;
+    }
+
+    public void setArgumentWrapper(DataArgumentWrapper argumentWrapper)
+    {
+        this.argumentWrapper = Objects.requireNonNull(argumentWrapper);
+    }
+
     private volatile Transaction currentTransaction;
 
     protected String tableName;
@@ -194,6 +287,8 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     protected final DataObjectContainer container;
 
     protected DatabaseManipulator manipulator;
+
+    protected DataArgumentWrapper argumentWrapper;
 
     protected static final Map<Class<?>, DataObject> CACHE = new HashMap<>();
 
