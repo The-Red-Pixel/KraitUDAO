@@ -24,10 +24,7 @@ package com.theredpixelteam.kraitudao.common;
 import com.theredpixelteam.kraitudao.DataSource;
 import com.theredpixelteam.kraitudao.DataSourceException;
 import com.theredpixelteam.kraitudao.Transaction;
-import com.theredpixelteam.kraitudao.common.sql.DataArgument;
-import com.theredpixelteam.kraitudao.common.sql.DataArgumentWrapper;
-import com.theredpixelteam.kraitudao.common.sql.DatabaseManipulator;
-import com.theredpixelteam.kraitudao.common.sql.DefaultDataArgumentWrapper;
+import com.theredpixelteam.kraitudao.common.sql.*;
 import com.theredpixelteam.kraitudao.dataobject.*;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
@@ -45,13 +42,16 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                                       String tableName,
                                       DataObjectInterpreter interpreter,
                                       DataObjectContainer container,
-                                      DataArgumentWrapper argumentWrapper)
+                                      DataArgumentWrapper argumentWrapper,
+                                      DataExtractorFactory extractorFactory)
             throws DataSourceException
     {
         this.connection = connection;
         this.tableName = tableName;
         this.interpreter = interpreter;
         this.container = container;
+        this.argumentWrapper = argumentWrapper;
+        this.extractorFactory = extractorFactory;
 
         try {
             this.connection.setAutoCommit(false);
@@ -66,7 +66,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                                       DataObjectContainer container)
             throws DataSourceException
     {
-        this(connection, tableName, interpreter, container, DefaultDataArgumentWrapper.INSTANCE);
+        this(connection, tableName, interpreter, container, DefaultDataArgumentWrapper.INSTANCE, DefaultDataExtractorFactory.INSTANCE);
     }
 
     public PlainSQLDatabaseDataSource(Connection connection,
@@ -165,8 +165,10 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             if(resultSet.getRow() != 1)
                 throw new DataSourceException("Multiple record found");
 
-            // for maximum compatibility
-            // TODO uncompleted
+            for(ValueObject valueObject : values.values())
+                valueObject.set(object, extractorFactory.create(valueObject.getType(), valueObject.getName())
+                        .orElseThrow(() -> new DataSourceException.UnsupportedValueType(valueObject.getType().getCanonicalName()))
+                        .extract(resultSet));
 
             resultSet.close();
         } catch (SQLException e) {
@@ -290,7 +292,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
     protected DataArgumentWrapper argumentWrapper;
 
-    protected static final Map<Class<?>, DataObject> CACHE = new HashMap<>();
+    protected DataExtractorFactory extractorFactory;
 
     private class TransactionImpl implements Transaction
     {
