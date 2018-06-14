@@ -1,5 +1,5 @@
 /*
- * DataArgumentWrapper.java
+ * DataExtractor.java
  *
  * Copyright (C) 2018 The Red Pixel <theredpixelteam.com>
  * Copyright (C) 2018 KuCrO3 Studio <kucro3.org>
@@ -21,8 +21,9 @@
 
 package com.theredpixelteam.kraitudao.common.sql;
 
-import java.util.Optional;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 
-public interface DataArgumentWrapper {
-    public Optional<DataArgument> wrap(Object object);
+public interface DataExtractor {
+    public Object extract(ResultSet resultSet) throws SQLException;
 }

@@ -1,5 +1,5 @@
 /*
- * DataArgumentWrapper.java
+ * DataSourceError.java
  *
  * Copyright (C) 2018 The Red Pixel <theredpixelteam.com>
  * Copyright (C) 2018 KuCrO3 Studio <kucro3.org>
@@ -19,10 +19,25 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-package com.theredpixelteam.kraitudao.common.sql;
+package com.theredpixelteam.kraitudao;
 
-import java.util.Optional;
+public class DataSourceError extends Error {
+    public DataSourceError()
+    {
+    }
 
-public interface DataArgumentWrapper {
-    public Optional<DataArgument> wrap(Object object);
+    public DataSourceError(String msg)
+    {
+        super(msg);
+    }
+
+    public DataSourceError(Throwable cause)
+    {
+        super(cause);
+    }
+
+    public DataSourceError(String msg, Throwable cause)
+    {
+        super(msg, cause);
+    }
 }

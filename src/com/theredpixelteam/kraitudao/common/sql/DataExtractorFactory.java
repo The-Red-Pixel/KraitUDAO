@@ -1,5 +1,5 @@
 /*
- * DataArgumentWrapper.java
+ * DataExtractorFactory.java
  *
  * Copyright (C) 2018 The Red Pixel <theredpixelteam.com>
  * Copyright (C) 2018 KuCrO3 Studio <kucro3.org>
@@ -23,6 +23,8 @@ package com.theredpixelteam.kraitudao.common.sql;
 
 import java.util.Optional;
 
-public interface DataArgumentWrapper {
-    public Optional<DataArgument> wrap(Object object);
+public interface DataExtractorFactory {
+    public Optional<DataExtractor> create(Class<?> type, String columnName);
+
+    public Optional<DataExtractor> create(Class<?> type, int columnIndex);
 }
