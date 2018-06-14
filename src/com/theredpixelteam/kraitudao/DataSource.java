@@ -32,7 +32,7 @@ public interface DataSource {
         pull(object, (Class) object.getClass());
     }
 
-    public <T> void pull(T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException;
+    public <T> boolean pull(T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException;
 
     public <T> Collection<T> pull(Class<T> type) throws DataSourceException, DataObjectInterpretationException;
 

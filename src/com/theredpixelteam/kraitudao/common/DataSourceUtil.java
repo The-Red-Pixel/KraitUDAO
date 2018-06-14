@@ -47,10 +47,10 @@ public final class DataSourceUtil {
         }
 
         @Override
-        public synchronized <T> void pull(T object, Class<T> type)
+        public synchronized <T> boolean pull(T object, Class<T> type)
                 throws DataSourceException, DataObjectInterpretationException
         {
-            this.object.pull(object, type);
+            return this.object.pull(object, type);
         }
 
         @Override

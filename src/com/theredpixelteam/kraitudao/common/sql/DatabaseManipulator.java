@@ -21,10 +21,12 @@
 
 package com.theredpixelteam.kraitudao.common.sql;
 
+import com.theredpixelteam.kraitudao.common.DataObjectCache;
 import com.theredpixelteam.kraitudao.dataobject.DataObject;
 import com.theredpixelteam.kraitudao.dataobject.DataObjectContainer;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
+import com.theredpixelteam.kraitudao.interpreter.StandardDataObjectInterpreter;
 import com.theredpixelteam.redtea.util.Pair;
 
 import java.sql.Connection;
@@ -62,6 +64,14 @@ public interface DatabaseManipulator {
         createTable(connection, tableName, container.interpretIfAbsent(dataType, interpreter));
     }
 
+    public default void createTable(Connection connection,
+                                    String tableName,
+                                    Class<?> dataType)
+            throws SQLException, DataObjectInterpretationException
+    {
+        createTable(connection, tableName, dataType, DataObjectCache.getGlobal(), StandardDataObjectInterpreter.INSTANCE);
+    }
+
     public boolean createTableIfNotExists(Connection connection,
                                           String tableName,
                                           DataObject dataObject)
@@ -75,5 +85,13 @@ public interface DatabaseManipulator {
             throws SQLException, DataObjectInterpretationException
     {
         return createTableIfNotExists(connection, tableName, container.interpretIfAbsent(dataType, interpreter));
+    }
+
+    public default boolean createTableIfNotExists(Connection connection,
+                                                  String tableName,
+                                                  Class<?> dataType)
+            throws SQLException, DataObjectInterpretationException
+    {
+        return createTableIfNotExists(connection, tableName, dataType, DataObjectCache.getGlobal(), StandardDataObjectInterpreter.INSTANCE);
     }
 }

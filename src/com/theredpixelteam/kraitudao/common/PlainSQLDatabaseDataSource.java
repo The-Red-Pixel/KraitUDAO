@@ -42,6 +42,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                                       String tableName,
                                       DataObjectInterpreter interpreter,
                                       DataObjectContainer container,
+                                      DatabaseManipulator databaseManipulator,
                                       DataArgumentWrapper argumentWrapper,
                                       DataExtractorFactory extractorFactory)
             throws DataSourceException
@@ -50,6 +51,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         this.tableName = tableName;
         this.interpreter = interpreter;
         this.container = container;
+        this.manipulator = databaseManipulator;
         this.argumentWrapper = argumentWrapper;
         this.extractorFactory = extractorFactory;
 
@@ -63,10 +65,20 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     public PlainSQLDatabaseDataSource(Connection connection,
                                       String tableName,
                                       DataObjectInterpreter interpreter,
+                                      DataObjectContainer container,
+                                      DatabaseManipulator databaseManipulator)
+            throws DataSourceException
+    {
+        this(connection, tableName, interpreter, container, databaseManipulator, DefaultDataArgumentWrapper.INSTANCE, DefaultDataExtractorFactory.INSTANCE);
+    }
+
+    public PlainSQLDatabaseDataSource(Connection connection,
+                                      String tableName,
+                                      DataObjectInterpreter interpreter,
                                       DataObjectContainer container)
             throws DataSourceException
     {
-        this(connection, tableName, interpreter, container, DefaultDataArgumentWrapper.INSTANCE, DefaultDataExtractorFactory.INSTANCE);
+        this(connection, tableName, interpreter, container, DefaultDatabaseManipulator.INSTANCE);
     }
 
     public PlainSQLDatabaseDataSource(Connection connection,
@@ -105,7 +117,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             else
                 return false;
         else
-            list.add(Pair.of(valueObject.getName(), argumentWrapper.wrap(object)
+            list.add(Pair.of(valueObject.getName(), argumentWrapper.wrap(value)
                     .orElseThrow(() -> new DataSourceException.UnsupportedValueType(valueObject.getType().getCanonicalName()))));
 
         return true;
@@ -125,7 +137,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T> void pull(T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException
+    public <T> boolean pull(T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException
     {
         DataObject dataObject = container.interpretIfAbsent(type, interpreter);
 
@@ -158,22 +170,25 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         String[] nameArray = valueNames.toArray(new String[valueNames.size()]);
 
         try {
-            ResultSet resultSet = manipulator.query(connection, tableName, keyArray, nameArray);
+            try(ResultSet resultSet = manipulator.query(connection, tableName, keyArray, nameArray)) {
+                if(!resultSet.next())
+                    return false;
 
-            resultSet.last();
+                if (!resultSet.isLast())
+                    throw new DataSourceException("Multiple record found");
 
-            if(resultSet.getRow() != 1)
-                throw new DataSourceException("Multiple record found");
-
-            for(ValueObject valueObject : values.values())
-                valueObject.set(object, extractorFactory.create(valueObject.getType(), valueObject.getName())
-                        .orElseThrow(() -> new DataSourceException.UnsupportedValueType(valueObject.getType().getCanonicalName()))
-                        .extract(resultSet));
-
-            resultSet.close();
+                for (ValueObject valueObject : values.values())
+                {
+                    valueObject.set(object, extractorFactory.create(valueObject.getType(), valueObject.getName())
+                            .orElseThrow(() -> new DataSourceException.UnsupportedValueType(valueObject.getType().getCanonicalName()))
+                            .extract(resultSet));
+                }
+            }
         } catch (SQLException e) {
             throw new DataSourceException("SQLException", e);
         }
+
+        return true;
     }
 
     @Override
@@ -276,6 +291,16 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     public void setArgumentWrapper(DataArgumentWrapper argumentWrapper)
     {
         this.argumentWrapper = Objects.requireNonNull(argumentWrapper);
+    }
+
+    public void setExtractorFactory(DataExtractorFactory extractorFactory)
+    {
+        this.extractorFactory = Objects.requireNonNull(extractorFactory);
+    }
+
+    public DataExtractorFactory getExtractorFactory()
+    {
+        return extractorFactory;
     }
 
     private volatile Transaction currentTransaction;

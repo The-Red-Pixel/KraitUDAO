@@ -91,7 +91,7 @@ public class DefaultDataExtractorFactory implements DataExtractorFactory {
     {
         {
             put(boolean.class, (r, n, i, u) -> u ? r.getBoolean(i) : r.getBoolean(n));
-            put(byte.class, (r, n, i, u) -> readSilently(u ? r.getBinaryStream(i) : r.getBinaryStream(n)));
+            put(byte.class, (r, n, i, u) -> (u ? r.getBytes(i) : r.getBytes(n))[0]);
             put(char.class, (r, n, i, u) -> readSilently(u ? r.getNCharacterStream(i) : r.getNCharacterStream(n)));
             put(short.class, (r, n, i, u) -> u ? r.getShort(i) : r.getShort(n));
             put(int.class, (r, n, i, u) -> u ? r.getInt(i) : r.getInt(n));
