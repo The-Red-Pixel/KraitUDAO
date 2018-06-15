@@ -68,6 +68,13 @@ public final class DataSourceUtil {
         }
 
         @Override
+        public <T> Collection<T> pullVaguely(T object, Class<T> type)
+                throws DataSourceException, DataObjectInterpretationException
+        {
+            return this.object.pullVaguely(object, type);
+        }
+
+        @Override
         public synchronized <T> Transaction commit(T object, Class<T> type)
                 throws DataSourceException, DataObjectInterpretationException
         {
@@ -96,6 +103,13 @@ public final class DataSourceUtil {
         }
 
         @Override
+        public <T> Transaction remove(Transaction transaction, T object, Class<T> type)
+                throws DataSourceException, DataObjectInterpretationException
+        {
+            return this.object.remove(transaction, object, type);
+        }
+
+        @Override
         public synchronized <T> Transaction clear() throws DataSourceException
         {
             return new SynchronizedTransaction(this.object.clear());
@@ -119,6 +133,13 @@ public final class DataSourceUtil {
                 throws DataSourceException, DataObjectInterpretationException
         {
             return this.object.removeVaguely(transition, object);
+        }
+
+        @Override
+        public <T> Transaction removeVaguely(Transaction transaction, T object, Class<T> type)
+                throws DataSourceException, DataObjectInterpretationException
+        {
+            return this.object.removeVaguely(transaction, object, type);
         }
 
         @Override
