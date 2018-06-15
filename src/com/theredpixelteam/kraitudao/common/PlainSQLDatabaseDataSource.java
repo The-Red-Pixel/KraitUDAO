@@ -24,6 +24,7 @@ package com.theredpixelteam.kraitudao.common;
 import com.theredpixelteam.kraitudao.DataSource;
 import com.theredpixelteam.kraitudao.DataSourceException;
 import com.theredpixelteam.kraitudao.Transaction;
+import com.theredpixelteam.kraitudao.annotations.Unique;
 import com.theredpixelteam.kraitudao.common.sql.*;
 import com.theredpixelteam.kraitudao.dataobject.*;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
@@ -135,6 +136,15 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         return putArgument0(list, object, valueObject, null, false);
     }
 
+    private void extract(Object object, Collection<ValueObject> valueObjects, ResultSet resultSet)
+            throws DataSourceException.UnsupportedValueType, SQLException
+    {
+        for (ValueObject valueObject : valueObjects)
+            valueObject.set(object, extractorFactory.create(valueObject.getType(), valueObject.getName())
+                    .orElseThrow(() -> new DataSourceException.UnsupportedValueType(valueObject.getType().getCanonicalName()))
+                    .extract(resultSet));
+    }
+
     @SuppressWarnings("unchecked")
     @Override
     public <T> boolean pull(T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException
@@ -169,21 +179,14 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         Pair<String, DataArgument>[] keyArray = keys.toArray(new Pair[keys.size()]);
         String[] nameArray = valueNames.toArray(new String[valueNames.size()]);
 
-        try {
-            try(ResultSet resultSet = manipulator.query(connection, tableName, keyArray, nameArray)) {
-                if(!resultSet.next())
-                    return false;
+        try(ResultSet resultSet = manipulator.query(connection, tableName, keyArray, nameArray)) {
+            if(!resultSet.next())
+                return false;
 
-                if (!resultSet.isLast())
-                    throw new DataSourceException("Multiple record found");
+            if (!resultSet.isLast())
+                throw new DataSourceException("Multiple record found");
 
-                for (ValueObject valueObject : values.values())
-                {
-                    valueObject.set(object, extractorFactory.create(valueObject.getType(), valueObject.getName())
-                            .orElseThrow(() -> new DataSourceException.UnsupportedValueType(valueObject.getType().getCanonicalName()))
-                            .extract(resultSet));
-                }
-            }
+            extract(object, values.values(), resultSet);
         } catch (SQLException e) {
             throw new DataSourceException("SQLException", e);
         }
@@ -192,9 +195,66 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     }
 
     @Override
-    public <T> Collection<T> pull(Class<T> type) throws DataSourceException
+    public <T> Collection<T> pull(Class<T> type) throws DataSourceException, DataObjectInterpretationException
     {
-        return null;
+        DataObject dataObject = container.interpretIfAbsent(type, interpreter);
+
+        List<String> valueNames = new ArrayList<>();
+        List<ValueObject> valueObjects = new ArrayList<>();
+
+        if(dataObject instanceof UniqueDataObject)
+        {
+            UniqueDataObject uniqueDataObject = (UniqueDataObject) dataObject;
+            ValueObject key = uniqueDataObject.getKey();
+
+            valueNames.add(key.getName());
+            valueObjects.add(key);
+        }
+        else if(dataObject instanceof MultipleDataObject)
+        {
+            MultipleDataObject multipleDataObject = (MultipleDataObject) dataObject;
+            ValueObject primaryKey = multipleDataObject.getPrimaryKey();
+            Map<String, ValueObject> secondaryKeys = multipleDataObject.getSecondaryKeys();
+
+            valueNames.add(primaryKey.getName());
+            valueObjects.add(primaryKey);
+
+            for(Map.Entry<String, ValueObject> entry : secondaryKeys.entrySet())
+            {
+                valueNames.add(entry.getKey());
+                valueObjects.add(entry.getValue());
+            }
+        }
+
+        Map<String, ValueObject> values = dataObject.getValues();
+        for(Map.Entry<String, ValueObject> entry : values.entrySet())
+        {
+            valueNames.add(entry.getKey());
+            valueObjects.add(entry.getValue());
+        }
+
+        String[] valueArray = valueNames.toArray(new String[valueNames.size()]);
+
+        try(ResultSet resultSet = manipulator.query(connection, tableName, null, valueArray)) {
+            if(!resultSet.next())
+                return Collections.emptyList();
+
+            List<T> objects = new ArrayList<>();
+
+            do {
+                T object = type.newInstance();
+
+                extract(object, valueObjects, resultSet);
+
+                objects.add(object);
+            } while(resultSet.next());
+
+            return objects;
+        } catch (SQLException e) {
+            throw new DataSourceException("SQLException", e);
+        } catch (InstantiationException | IllegalAccessException e) {
+            throw new DataSourceException("Reflection Exception", e);
+        }
     }
 
     @Override

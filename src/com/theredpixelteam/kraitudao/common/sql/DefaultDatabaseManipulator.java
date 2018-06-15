@@ -46,8 +46,9 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
                         " FROM " + tableName +
                         " WHERE " + narrow(keys));
 
-        for(int i = 0; i < keys.length;)
-            keys[i].second().apply(preparedStatement, ++i);
+        if(keys != null)
+            for(int i = 0; i < keys.length;)
+                keys[i].second().apply(preparedStatement, ++i);
 
         return preparedStatement.executeQuery();
     }
