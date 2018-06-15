@@ -23,48 +23,84 @@ package com.theredpixelteam.kraitudao;
 
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
 
+import java.io.InterruptedIOException;
 import java.util.Collection;
 
 @SuppressWarnings("unchecked")
 public interface DataSource {
-    public default void pull(Object object) throws DataSourceException, DataObjectInterpretationException
+    public default <T> void pull(T object) throws DataSourceException, DataObjectInterpretationException
     {
-        pull(object, (Class) object.getClass());
+        pull(object, (Class<T>) object.getClass());
     }
 
     public <T> boolean pull(T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException;
 
     public <T> Collection<T> pull(Class<T> type) throws DataSourceException, DataObjectInterpretationException;
 
-    public <T> Collection<T> pullVaguely(T object) throws DataSourceException, DataObjectInterpretationException;
+    public default <T> Collection<T> pullVaguely(T object) throws DataSourceException, DataObjectInterpretationException
+    {
+        return pullVaguely(object, (Class<T>)object.getClass());
+    }
+
+    public <T> Collection<T> pullVaguely(T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException;
+
+    public default <T> Transaction commit(T object) throws DataSourceException, DataObjectInterpretationException
+    {
+        return commit(null, object);
+    }
+
+    public default <T> Transaction commit(Transaction transaction, T object) throws DataSourceException, DataObjectInterpretationException
+    {
+        return commit(transaction, object, (Class<T>)object.getClass());
+    }
 
     public default <T> Transaction commit(T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException
     {
         return commit(null, object, type);
     }
 
-    public <T> Transaction commit(Transaction transition, T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException;
+    public <T> Transaction commit(Transaction transaction, T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException;
 
     public default <T> Transaction remove(T object) throws DataSourceException, DataObjectInterpretationException
     {
         return remove(null, object);
     }
 
-    public <T> Transaction remove(Transaction transition, T object) throws DataSourceException, DataObjectInterpretationException;
+    public default <T> Transaction remove(T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException
+    {
+        return remove(null, object, type);
+    }
+
+    public default <T> Transaction remove(Transaction transaction, T object) throws DataSourceException, DataObjectInterpretationException
+    {
+        return remove(transaction, object, (Class<T>)object.getClass());
+    }
+
+    public <T> Transaction remove(Transaction transaction, T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException;
 
     public default <T> Transaction clear() throws DataSourceException
     {
         return clear(null);
     }
 
-    public <T> Transaction clear(Transaction transition) throws DataSourceException;
+    public <T> Transaction clear(Transaction transaction) throws DataSourceException;
 
     public default <T> Transaction removeVaguely(T object) throws DataSourceException, DataObjectInterpretationException
     {
         return removeVaguely(null, object);
     }
 
-    public <T> Transaction removeVaguely(Transaction transition, T object) throws DataSourceException, DataObjectInterpretationException;
+    public default<T> Transaction removeVaguely(T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException
+    {
+        return removeVaguely(null, object, type);
+    }
+
+    public default <T> Transaction removeVaguely(Transaction transaction, T object) throws DataSourceException, DataObjectInterpretationException
+    {
+        return removeVaguely(transaction, object, (Class<T>)object.getClass());
+    }
+
+    public <T> Transaction removeVaguely(Transaction transaction, T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException;
 
     public void waitForTransaction();
 }

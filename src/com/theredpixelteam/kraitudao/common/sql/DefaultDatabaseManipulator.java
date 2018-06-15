@@ -61,12 +61,13 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
                 "DELETE FROM " + tableName +
                         " WHERE " + narrow(keysAndValues));
 
-        for(int i = 0; i < keysAndValues.length;)
-            keysAndValues[i].second().apply(preparedStatement, ++i);
+        if(keysAndValues != null)
+            for(int i = 0; i < keysAndValues.length;)
+                keysAndValues[i].second().apply(preparedStatement, ++i);
 
         int n = preparedStatement.executeUpdate();
 
-        preparedStatement.close();;
+        preparedStatement.close();
 
         return n;
     }

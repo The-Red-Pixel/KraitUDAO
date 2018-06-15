@@ -24,7 +24,6 @@ package com.theredpixelteam.kraitudao.common;
 import com.theredpixelteam.kraitudao.DataSource;
 import com.theredpixelteam.kraitudao.DataSourceException;
 import com.theredpixelteam.kraitudao.Transaction;
-import com.theredpixelteam.kraitudao.annotations.Unique;
 import com.theredpixelteam.kraitudao.common.sql.*;
 import com.theredpixelteam.kraitudao.dataobject.*;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
@@ -258,38 +257,50 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     }
 
     @Override
-    public <T> Collection<T> pullVaguely(T object) throws DataSourceException
+    public <T> Collection<T> pullVaguely(T object, Class<T> type) throws DataSourceException
     {
         return null;
     }
 
     @Override
-    public <T> Transaction commit(Transaction transition, T object, Class<T> type) throws DataSourceException
+    public <T> Transaction commit(Transaction transaction, T object, Class<T> type) throws DataSourceException
     {
         return null;
     }
 
     @Override
-    public <T> Transaction remove(Transaction transition, T object) throws DataSourceException
+    public <T> Transaction remove(Transaction transaction, T object, Class<T> type) throws DataSourceException
     {
-        return null;
+        checkTransaction(transaction);
+
+
+        return new TransactionImpl();
     }
 
     @Override
-    public <T> Transaction clear(Transaction transition) throws DataSourceException
+    public <T> Transaction clear(Transaction transaction) throws DataSourceException
     {
-        return null;
+        checkTransaction(transaction);
+
+        try {
+            manipulator.delete(connection, tableName, null);
+        } catch (SQLException e) {
+            throw new DataSourceException("SQLException", e);
+        }
+
+        return new TransactionImpl();
     }
 
     @Override
-    public <T> Transaction removeVaguely(Transaction transition, T object) throws DataSourceException
+    public <T> Transaction removeVaguely(Transaction transaction, T object, Class<T> type) throws DataSourceException
     {
         return null;
     }
 
     private void checkTransaction(Transaction transaction) throws DataSourceException
     {
-        if((transaction == null && this.currentTransaction != null) || !transaction.equals(this.currentTransaction))
+        if((transaction == null && this.currentTransaction != null)
+                || (transaction != null && !transaction.equals(this.currentTransaction)))
             throw new DataSourceException.Busy();
     }
 
