@@ -23,7 +23,6 @@ package com.theredpixelteam.kraitudao;
 
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
 
-import java.io.InterruptedIOException;
 import java.util.Collection;
 
 @SuppressWarnings("unchecked")
@@ -49,9 +48,19 @@ public interface DataSource {
         return commit(null, object);
     }
 
+    public default <T> void commitInstantly(T object) throws DataSourceException, DataObjectInterpretationException
+    {
+        commit(object).push();
+    }
+
     public default <T> Transaction commit(Transaction transaction, T object) throws DataSourceException, DataObjectInterpretationException
     {
         return commit(transaction, object, (Class<T>)object.getClass());
+    }
+
+    public default <T> void commitInstantly(Transaction transaction, T object) throws DataSourceException, DataObjectInterpretationException
+    {
+        commit(transaction, object).push();
     }
 
     public default <T> Transaction commit(T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException
@@ -59,11 +68,26 @@ public interface DataSource {
         return commit(null, object, type);
     }
 
+    public default <T> void commitInstantly(T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException
+    {
+        commit(object, type).push();
+    }
+
     public <T> Transaction commit(Transaction transaction, T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException;
+
+    public default <T> void commitInstantly(Transaction transaction, T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException
+    {
+        commit(transaction, object, type).push();
+    }
 
     public default <T> Transaction remove(T object) throws DataSourceException, DataObjectInterpretationException
     {
         return remove(null, object);
+    }
+
+    public default <T> void removeInstantly(T object) throws DataSourceException, DataObjectInterpretationException
+    {
+        remove(object).push();
     }
 
     public default <T> Transaction remove(T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException
@@ -71,19 +95,44 @@ public interface DataSource {
         return remove(null, object, type);
     }
 
+    public default <T> void removeInstantly(T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException
+    {
+        remove(object, type).push();
+    }
+
     public default <T> Transaction remove(Transaction transaction, T object) throws DataSourceException, DataObjectInterpretationException
     {
         return remove(transaction, object, (Class<T>)object.getClass());
     }
 
+    public default <T> void removeInstantly(Transaction transaction, T object) throws DataSourceException, DataObjectInterpretationException
+    {
+        remove(transaction, object).push();
+    }
+
     public <T> Transaction remove(Transaction transaction, T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException;
 
-    public default <T> Transaction clear() throws DataSourceException
+    public default <T> void removeInstantly(Transaction transaction, T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException
+    {
+        remove(transaction, object, type).push();
+    }
+
+    public default Transaction clear() throws DataSourceException
     {
         return clear(null);
     }
 
-    public <T> Transaction clear(Transaction transaction) throws DataSourceException;
+    public default void clearInstantly() throws DataSourceException
+    {
+        clear().push();
+    }
+
+    public Transaction clear(Transaction transaction) throws DataSourceException;
+
+    public default void clearInstantly(Transaction transaction) throws DataSourceException
+    {
+        clear(transaction).push();
+    }
 
     public default <T> Transaction removeVaguely(T object) throws DataSourceException, DataObjectInterpretationException
     {

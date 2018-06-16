@@ -21,14 +21,14 @@
 
 package com.theredpixelteam.kraitudao;
 
-import com.theredpixelteam.kraitudao.annotations.Key;
-import com.theredpixelteam.kraitudao.annotations.Unique;
-import com.theredpixelteam.kraitudao.annotations.Value;
+import com.theredpixelteam.kraitudao.annotations.*;
 import com.theredpixelteam.kraitudao.annotations.metadata.common.NotNull;
+import com.theredpixelteam.kraitudao.annotations.metadata.common.Precision;
 import com.theredpixelteam.kraitudao.common.DataObjectCache;
 import com.theredpixelteam.kraitudao.common.PlainSQLDatabaseDataSource;
 import com.theredpixelteam.kraitudao.common.sql.DefaultDatabaseManipulator;
 import com.theredpixelteam.kraitudao.dataobject.DataObject;
+import com.theredpixelteam.kraitudao.dataobject.MultipleDataObject;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
 import com.theredpixelteam.kraitudao.interpreter.StandardDataObjectInterpreter;
 
@@ -47,24 +47,16 @@ public class Test {
         DataObjectInterpreter interpreter = new StandardDataObjectInterpreter();
         DataObject dataObject = interpreter.get(A.class);
 
-        DefaultDatabaseManipulator.INSTANCE.createTableIfNotExists(connection, "TEST", A.class,
+        DefaultDatabaseManipulator.INSTANCE.createTableIfNotExists(connection, "TESTB", B.class,
                 DataObjectCache.getGlobal(), StandardDataObjectInterpreter.INSTANCE);
 
-        A a = new A();
-        a.a = 3;
-        DataSource dataSource = new PlainSQLDatabaseDataSource(connection, "TEST");
+        B b = new B();
+        DataSource dataSource = new PlainSQLDatabaseDataSource(connection, "TESTB");
 
-        long m = System.currentTimeMillis();
-        dataSource.pull(a, A.class);
-        System.out.println((System.currentTimeMillis() - m) + "ms");
+        System.out.println(((MultipleDataObject)DataObjectCache.getGlobal().get(B.class).get()).getSecondaryKeys());
 
-        System.out.println(a.b);
-
-        Collection<A> collection;
-        collection = dataSource.pull(A.class);
-
-        for(A e : collection)
-            System.out.println("a = " + e.a + ", b = " + e.b);
+        for(B ab : dataSource.pullVaguely(b))
+            System.out.println(ab.B);
     }
 
     @Unique
@@ -77,4 +69,18 @@ public class Test {
         @Value
         public int b;
     }
+
+    @Multiple
+    public static class B
+    {
+        @PrimaryKey
+        public int A = 0;
+
+        @SecondaryKey
+        public int B;
+
+        @Value
+        public int C;
+    }
+
 }
