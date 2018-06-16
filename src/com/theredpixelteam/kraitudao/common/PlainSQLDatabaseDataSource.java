@@ -106,7 +106,11 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         return this.tableName;
     }
 
-    private boolean putArgument0(List<Pair<String, DataArgument>> list, Object object, ValueObject valueObject, String msgOnNull, boolean nonNull)
+    private boolean putArgument0(List<Pair<String, DataArgument>> list,
+                                 Object object,
+                                 ValueObject valueObject,
+                                 String msgOnNull,
+                                 boolean nonNull)
             throws DataSourceException
     {
         Object value = valueObject.get(object);
@@ -123,18 +127,6 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         return true;
     }
 
-    private void putArgument(List<Pair<String, DataArgument>> list, Object object, ValueObject valueObject, String msgOnNull)
-            throws DataSourceException
-    {
-        putArgument0(list, object, valueObject, msgOnNull, true);
-    }
-
-    private boolean putArgumentIfNotNull(List<Pair<String, DataArgument>> list, Object object, ValueObject valueObject)
-            throws DataSourceException
-    {
-        return putArgument0(list, object, valueObject, null, false);
-    }
-
     private void extract(Object object, Collection<ValueObject> valueObjects, ResultSet resultSet)
             throws DataSourceException.UnsupportedValueType, SQLException
     {
@@ -142,6 +134,71 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             valueObject.set(object, extractorFactory.create(valueObject.getType(), valueObject.getName())
                     .orElseThrow(() -> new DataSourceException.UnsupportedValueType(valueObject.getType().getCanonicalName()))
                     .extract(resultSet));
+    }
+
+    private void putKeys(List<Pair<String, DataArgument>> list,
+                         DataObject dataObject,
+                         Object object,
+                         String[] msgOnNull)
+            throws DataSourceException, DataObjectInterpretationException
+    {
+        putKeys0(list, dataObject, object,null, null, msgOnNull, true);
+    }
+
+    private void putKeysIfNotNull(List<Pair<String, DataArgument>> list,
+                                  DataObject dataObject,
+                                  Object object,
+                                  List<String> valueNames,
+                                  List<ValueObject> valueObjects)
+            throws DataSourceException, DataObjectInterpretationException
+    {
+        putKeys0(list, dataObject, object, valueNames, valueObjects, null, false);
+    }
+
+    private void putKeys0(List<Pair<String, DataArgument>> list,
+                          DataObject dataObject,
+                          Object object,
+                          List<String> valueNames,
+                          List<ValueObject> valueObjects,
+                          String[] msgOnNull,
+                          boolean forceNonNull)
+            throws DataSourceException, DataObjectInterpretationException
+    {
+        if(msgOnNull == null)
+            msgOnNull = EMPTY_ARRAY;
+
+        if(dataObject instanceof UniqueDataObject)
+        {
+            UniqueDataObject uniqueDataObject = (UniqueDataObject) dataObject;
+            ValueObject key = uniqueDataObject.getKey();
+
+            if(!putArgument0(list, object, key, msgOnNull[0], forceNonNull))
+                putListPair(valueNames, valueObjects, key);
+        }
+        else if(dataObject instanceof MultipleDataObject)
+        {
+            MultipleDataObject multipleDataObject = (MultipleDataObject) dataObject;
+            ValueObject primaryKey = multipleDataObject.getPrimaryKey();
+            Collection<ValueObject> secondaryKeys = multipleDataObject.getSecondaryKeys().values();
+
+            if(!putArgument0(list, object, primaryKey, msgOnNull[1], forceNonNull))
+                putListPair(valueNames, valueObjects, primaryKey);
+
+            for(ValueObject secondaryKey : secondaryKeys)
+                if(!putArgument0(list, object, primaryKey, msgOnNull[2], forceNonNull))
+                    putListPair(valueNames, valueObjects, secondaryKey);
+        }
+        else
+            throw new DataObjectMalformationException.IllegalType();
+    }
+
+    private static void putListPair(List<String> valueNames, List<ValueObject> valueObjects, ValueObject valueObject)
+    {
+        if(valueNames != null)
+            valueNames.add(valueObject.getName());
+
+        if(valueObjects != null)
+            valueObjects.add(valueObject);
     }
 
     @SuppressWarnings("unchecked")
@@ -152,25 +209,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
         List<Pair<String, DataArgument>> keys = new ArrayList<>();
 
-        if(dataObject instanceof UniqueDataObject)
-        {
-            UniqueDataObject uniqueDataObject = (UniqueDataObject) dataObject;
-            ValueObject key = uniqueDataObject.getKey();
-
-            putArgument(keys, object, key, "Null key");
-        }
-        else if(dataObject instanceof MultipleDataObject)
-        {
-            MultipleDataObject multipleDataObject = (MultipleDataObject) dataObject;
-            ValueObject primarykey = multipleDataObject.getPrimaryKey();
-            Collection<ValueObject> secondaryKeys = multipleDataObject.getSecondaryKeys().values();
-
-            putArgument(keys, object, primarykey, "Null primary key");
-            for(ValueObject secondaryKey : secondaryKeys)
-                putArgument(keys, object, secondaryKey, "Null secondary key");
-        }
-        else
-            throw new DataObjectMalformationException.IllegalType();
+        putKeys(keys, dataObject, object, MSG_ON_NULL_ARRAY);
 
         Map<String, ValueObject> values = dataObject.getValues();
         Collection<String> valueNames = values.keySet();
@@ -268,11 +307,40 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         return null;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    public <T> Transaction remove(Transaction transaction, T object, Class<T> type) throws DataSourceException
+    public <T> Transaction remove(Transaction transaction, T object, Class<T> type)
+            throws DataSourceException, DataObjectInterpretationException
+    {
+        return remove0(transaction, object, type, false);
+    }
+
+    @Override
+    public <T> Transaction removeVaguely(Transaction transaction, T object, Class<T> type)
+            throws DataSourceException, DataObjectInterpretationException
+    {
+        return remove0(transaction, object, type, true);
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> Transaction remove0(Transaction transaction, T object, Class<T> type, boolean vaguely)
+            throws DataSourceException, DataObjectInterpretationException
     {
         checkTransaction(transaction);
 
+        DataObject dataObject = container.interpretIfAbsent(type, interpreter);
+        List<Pair<String, DataArgument>> keys = new ArrayList<>();
+
+        if(vaguely)
+            putKeysIfNotNull(keys, dataObject, object, null, null);
+        else
+            putKeys(keys, dataObject, object, MSG_ON_NULL_ARRAY);
+
+        try {
+            manipulator.delete(connection, tableName, keys.toArray(new Pair[keys.size()]));
+        } catch (SQLException e) {
+            throw new DataSourceException("SQLException", e);
+        }
 
         return new TransactionImpl();
     }
@@ -289,12 +357,6 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         }
 
         return new TransactionImpl();
-    }
-
-    @Override
-    public <T> Transaction removeVaguely(Transaction transaction, T object, Class<T> type) throws DataSourceException
-    {
-        return null;
     }
 
     private void checkTransaction(Transaction transaction) throws DataSourceException
@@ -389,6 +451,10 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     protected DataArgumentWrapper argumentWrapper;
 
     protected DataExtractorFactory extractorFactory;
+
+    private static final String[] MSG_ON_NULL_ARRAY = new String[] {"Null key", "Null primary key", "Null secondary key"};
+
+    private static final String[] EMPTY_ARRAY = new String[] {null, null, null};
 
     private class TransactionImpl implements Transaction
     {
