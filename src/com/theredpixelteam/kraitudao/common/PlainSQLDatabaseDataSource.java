@@ -24,6 +24,7 @@ package com.theredpixelteam.kraitudao.common;
 import com.theredpixelteam.kraitudao.DataSource;
 import com.theredpixelteam.kraitudao.DataSourceException;
 import com.theredpixelteam.kraitudao.Transaction;
+import com.theredpixelteam.kraitudao.annotations.metadata.common.NotNull;
 import com.theredpixelteam.kraitudao.common.sql.*;
 import com.theredpixelteam.kraitudao.dataobject.*;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
@@ -104,6 +105,15 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     public String getTableName()
     {
         return this.tableName;
+    }
+
+    private void putValue(List<Pair<String, DataArgument>> list,
+                          Object object,
+                          ValueObject valueObject,
+                          String msgOnNull)
+            throws DataSourceException
+    {
+        putArgument0(list, object, valueObject, msgOnNull, valueObject.getMetadata(NotNull.class).isPresent());
     }
 
     private boolean putArgument0(List<Pair<String, DataArgument>> list,
@@ -302,9 +312,20 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     }
 
     @Override
-    public <T> Transaction commit(Transaction transaction, T object, Class<T> type) throws DataSourceException
+    public <T> Transaction commit(Transaction transaction, T object, Class<T> type)
+            throws DataSourceException, DataObjectInterpretationException
     {
-        return null;
+        checkTransaction(transaction);
+
+        DataObject dataObject = container.interpretIfAbsent(type, interpreter);
+        List<Pair<String, DataArgument>> values = new ArrayList<>();
+
+        putKeys(values, dataObject, object, MSG_ON_NULL_ARRAY);
+
+        for(ValueObject value : dataObject.getValues().values())
+            putValue(values, object, value, "Null value (" + value.getName() + ") when @NotNull declared");
+
+        return transaction == null ? new TransactionImpl() : transaction;
     }
 
     @SuppressWarnings("unchecked")
@@ -342,7 +363,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             throw new DataSourceException("SQLException", e);
         }
 
-        return new TransactionImpl();
+        return transaction == null ? new TransactionImpl() : transaction;
     }
 
     @Override
@@ -356,7 +377,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             throw new DataSourceException("SQLException", e);
         }
 
-        return new TransactionImpl();
+        return transaction == null ? new TransactionImpl() : transaction;
     }
 
     private void checkTransaction(Transaction transaction) throws DataSourceException
