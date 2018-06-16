@@ -113,14 +113,15 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                           String msgOnNull)
             throws DataSourceException
     {
-        putArgument0(list, object, valueObject, msgOnNull, valueObject.getMetadata(NotNull.class).isPresent());
+        putArgument0(list, object, valueObject, msgOnNull, valueObject.getMetadata(NotNull.class).isPresent(), null);
     }
 
     private boolean putArgument0(List<Pair<String, DataArgument>> list,
                                  Object object,
                                  ValueObject valueObject,
                                  String msgOnNull,
-                                 boolean nonNull)
+                                 boolean nonNull,
+                                 KeyInjection injection)
             throws DataSourceException
     {
         Object value = valueObject.get(object);
@@ -130,9 +131,12 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                 throw new DataSourceException(msgOnNull);
             else
                 return false;
-        else
+        else {
             list.add(Pair.of(valueObject.getName(), argumentWrapper.wrap(value)
                     .orElseThrow(() -> new DataSourceException.UnsupportedValueType(valueObject.getType().getCanonicalName()))));
+
+            injection.injectiveElements.add(Pair.of(valueObject, value));
+        }
 
         return true;
     }
@@ -152,17 +156,18 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                          String[] msgOnNull)
             throws DataSourceException, DataObjectInterpretationException
     {
-        putKeys0(list, dataObject, object,null, null, msgOnNull, true);
+        putKeys0(list, dataObject, object,null, null, msgOnNull, true, null);
     }
 
     private void putKeysIfNotNull(List<Pair<String, DataArgument>> list,
                                   DataObject dataObject,
                                   Object object,
                                   List<String> valueNames,
-                                  List<ValueObject> valueObjects)
+                                  List<ValueObject> valueObjects,
+                                  KeyInjection keyInjection)
             throws DataSourceException, DataObjectInterpretationException
     {
-        putKeys0(list, dataObject, object, valueNames, valueObjects, null, false);
+        putKeys0(list, dataObject, object, valueNames, valueObjects, null, false, keyInjection);
     }
 
     private void putKeys0(List<Pair<String, DataArgument>> list,
@@ -171,7 +176,8 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                           List<String> valueNames,
                           List<ValueObject> valueObjects,
                           String[] msgOnNull,
-                          boolean forceNonNull)
+                          boolean forceNonNull,
+                          KeyInjection keyInjection)
             throws DataSourceException, DataObjectInterpretationException
     {
         if(msgOnNull == null)
@@ -182,7 +188,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             UniqueDataObject uniqueDataObject = (UniqueDataObject) dataObject;
             ValueObject key = uniqueDataObject.getKey();
 
-            if(!putArgument0(list, object, key, msgOnNull[0], forceNonNull))
+            if(!putArgument0(list, object, key, msgOnNull[0], forceNonNull, keyInjection))
                 putListPair(valueNames, valueObjects, key);
         }
         else if(dataObject instanceof MultipleDataObject)
@@ -191,11 +197,11 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             ValueObject primaryKey = multipleDataObject.getPrimaryKey();
             Collection<ValueObject> secondaryKeys = multipleDataObject.getSecondaryKeys().values();
 
-            if(!putArgument0(list, object, primaryKey, msgOnNull[1], forceNonNull))
+            if(!putArgument0(list, object, primaryKey, msgOnNull[1], forceNonNull, keyInjection))
                 putListPair(valueNames, valueObjects, primaryKey);
 
             for(ValueObject secondaryKey : secondaryKeys)
-                if(!putArgument0(list, object, primaryKey, msgOnNull[2], forceNonNull))
+                if(!putArgument0(list, object, primaryKey, msgOnNull[2], forceNonNull, keyInjection))
                     putListPair(valueNames, valueObjects, secondaryKey);
         }
         else
@@ -204,10 +210,10 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
     private static void putListPair(List<String> valueNames, List<ValueObject> valueObjects, ValueObject valueObject)
     {
-        if(valueNames != null)
+        if (valueNames != null)
             valueNames.add(valueObject.getName());
 
-        if(valueObjects != null)
+        if (valueObjects != null)
             valueObjects.add(valueObject);
     }
 
@@ -305,10 +311,45 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         }
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    public <T> Collection<T> pullVaguely(T object, Class<T> type) throws DataSourceException
+    public <T> Collection<T> pullVaguely(T object, Class<T> type)
+            throws DataSourceException, DataObjectInterpretationException
     {
-        return null;
+        DataObject dataObject = container.interpretIfAbsent(type, interpreter);
+
+        List<Pair<String, DataArgument>> keys = new ArrayList<>();
+        List<String> valueNames = new ArrayList<>();
+        List<ValueObject> valueObjects = new ArrayList<>();
+
+        KeyInjection keyInjection = new KeyInjection();
+
+        putKeysIfNotNull(keys, dataObject, object, valueNames, valueObjects, keyInjection);
+
+        Pair<String, DataArgument>[] keyArray = keys.toArray(new Pair[keys.size()]);
+        String[] valueArray = valueNames.toArray(new String[valueNames.size()]);
+
+        try (ResultSet resultSet = manipulator.query(connection, tableName, keyArray, valueArray)) {
+            if(!resultSet.next())
+                return Collections.emptyList();
+
+            List<T> objects = new ArrayList<>();
+
+            do {
+                T obj = type.newInstance();
+
+                keyInjection.inject(obj);
+                extract(obj, valueObjects, resultSet);
+
+                objects.add(obj);
+            } while (resultSet.next());
+
+            return objects;
+        } catch (SQLException e) {
+            throw new DataSourceException("SQLException", e);
+        } catch (InstantiationException | IllegalAccessException e) {
+            throw new DataSourceException("Reflection Exception", e);
+        }
     }
 
     @Override
@@ -353,7 +394,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         List<Pair<String, DataArgument>> keys = new ArrayList<>();
 
         if(vaguely)
-            putKeysIfNotNull(keys, dataObject, object, null, null);
+            putKeysIfNotNull(keys, dataObject, object, null, null, null);
         else
             putKeys(keys, dataObject, object, MSG_ON_NULL_ARRAY);
 
@@ -536,5 +577,16 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         private Exception lastException;
 
         private boolean valid = true;
+    }
+
+    private static class KeyInjection
+    {
+        void inject(Object object)
+        {
+            for(Pair<ValueObject, Object> entry : injectiveElements)
+                entry.first().set(object, entry.second());
+        }
+
+        private final List<Pair<ValueObject, Object>> injectiveElements = new ArrayList<>();
     }
 }

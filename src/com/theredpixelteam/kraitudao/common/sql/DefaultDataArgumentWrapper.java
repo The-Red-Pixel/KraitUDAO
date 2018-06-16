@@ -50,9 +50,7 @@ public class DefaultDataArgumentWrapper implements DataArgumentWrapper {
             return Optional.empty();
         }
 
-        final DataArgumentApplier confirmedApplier = applier;
-
-        return Optional.of(((p, i) -> confirmedApplier.apply(p, i, object)));
+        return Optional.of(new DataArgumentImpl(object, applier));
     }
 
     public static final DefaultDataArgumentWrapper INSTANCE = new DefaultDataArgumentWrapper();
@@ -71,6 +69,31 @@ public class DefaultDataArgumentWrapper implements DataArgumentWrapper {
             put(BigDecimal.class,   (p, i, v) -> p.setBigDecimal(i, (BigDecimal) v));
         }
     };
+
+    private static class DataArgumentImpl implements DataArgument
+    {
+        DataArgumentImpl(Object value, DataArgumentApplier applier)
+        {
+            this.value = value;
+            this.applier = applier;
+        }
+
+        @Override
+        public void apply(PreparedStatement preparedStatement, int index) throws SQLException
+        {
+            this.applier.apply(preparedStatement, index, value);
+        }
+
+        @Override
+        public Object getValue()
+        {
+            return value;
+        }
+
+        private final DataArgumentApplier applier;
+
+        private final Object value;
+    }
 
     private static interface DataArgumentApplier
     {
