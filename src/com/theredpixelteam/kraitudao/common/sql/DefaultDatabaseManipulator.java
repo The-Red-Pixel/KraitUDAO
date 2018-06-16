@@ -27,6 +27,7 @@ import com.theredpixelteam.kraitudao.annotations.metadata.common.Size;
 import com.theredpixelteam.kraitudao.dataobject.*;
 import com.theredpixelteam.kraitudao.misc.TypeUtil;
 import com.theredpixelteam.redtea.util.Pair;
+import com.theredpixelteam.redtea.util.VaguePair;
 
 import java.io.InputStream;
 import java.io.Reader;
@@ -79,6 +80,8 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
         if(values == null || values.length == 0)
             return 0;
 
+        VaguePair.applyAll(values, VaguePair.STRING_FIRST_ONLY);
+
         PreparedStatement preparedStatement = connection.prepareStatement(
                 "MERGE INTO " + tableName +
                         " KEY (" + combine(values, ",", null) + ")" +
@@ -118,7 +121,7 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
 
             appendTableElement(stmt, key);
 
-            constraint.append("CONSTRAINT CONSTRAINT_KEY PRIMARY KEY (").append(key.getName()).append(")");
+            constraint.append("CONSTRAINT CONSTRAINT_PRIMARY_KEY PRIMARY KEY (").append(key.getName()).append(")");
         }
         else if(dataObject instanceof MultipleDataObject)
         {
@@ -128,8 +131,7 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
             appendTableElement(stmt, primaryKey);
 
 
-            constraint.append("CONSTRAINT CONSTRAINT_PRIMARY_KEY PRIMARY KEY (").append(primaryKey.getName()).append(")")
-                    .append("CONSTRAINT CONSTRAINT_SECONDARY_KEYS SECONDARY KEY (");
+            constraint.append("CONSTRAINT CONSTRAINT_PRIMARY_KEY PRIMARY KEY (").append(primaryKey.getName()).append(",");
 
             Collection<ValueObject> valueObjectCollection = multipleDataObject.getSecondaryKeys().values();
             int valueObjectCollectionSize = valueObjectCollection.size(), i = 0;
@@ -259,7 +261,7 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
             TypeDecorator notNullDecorator = (type, valueObject) -> {
                 Optional<NotNull> metadata = valueObject.getMetadata(NotNull.class);
 
-                if(!metadata.isPresent())
+                if(!metadata.isPresent() && !valueObject.isKey())
                     return type;
                 else
                     return type + " NOT NULL";

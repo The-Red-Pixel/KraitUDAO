@@ -22,6 +22,7 @@
 package com.theredpixelteam.kraitudao.common.sql;
 
 import com.theredpixelteam.kraitudao.DataSourceError;
+import com.theredpixelteam.kraitudao.misc.TypeUtil;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -38,7 +39,7 @@ public class DefaultDataExtractorFactory implements DataExtractorFactory {
     @Override
     public Optional<DataExtractor> create(Class<?> type, String columnName)
     {
-        DirectableDataExtractor directableDataExtractor = MAPPED.get(type);
+        DirectableDataExtractor directableDataExtractor = MAPPED.get(TypeUtil.tryToUnbox(type));
 
         if(directableDataExtractor == null)
             return Optional.empty();
@@ -49,7 +50,7 @@ public class DefaultDataExtractorFactory implements DataExtractorFactory {
     @Override
     public Optional<DataExtractor> create(Class<?> type, int columnIndex)
     {
-        DirectableDataExtractor directableDataExtractor = MAPPED.get(type);
+        DirectableDataExtractor directableDataExtractor = MAPPED.get(TypeUtil.tryToUnbox(type));
 
         if(directableDataExtractor == null)
             return Optional.empty();

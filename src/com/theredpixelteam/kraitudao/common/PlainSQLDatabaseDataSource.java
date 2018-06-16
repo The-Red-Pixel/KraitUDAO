@@ -135,7 +135,8 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             list.add(Pair.of(valueObject.getName(), argumentWrapper.wrap(value)
                     .orElseThrow(() -> new DataSourceException.UnsupportedValueType(valueObject.getType().getCanonicalName()))));
 
-            injection.injectiveElements.add(Pair.of(valueObject, value));
+            if(injection != null)
+                injection.injectiveElements.add(Pair.of(valueObject, value));
         }
 
         return true;
@@ -197,11 +198,11 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             ValueObject primaryKey = multipleDataObject.getPrimaryKey();
             Collection<ValueObject> secondaryKeys = multipleDataObject.getSecondaryKeys().values();
 
-            if(!putArgument0(list, object, primaryKey, msgOnNull[1], forceNonNull, keyInjection))
+            if(!putArgument0(list, object, primaryKey, msgOnNull[1], true, keyInjection))
                 putListPair(valueNames, valueObjects, primaryKey);
 
             for(ValueObject secondaryKey : secondaryKeys)
-                if(!putArgument0(list, object, primaryKey, msgOnNull[2], forceNonNull, keyInjection))
+                if(!putArgument0(list, object, secondaryKey, msgOnNull[2], forceNonNull, keyInjection))
                     putListPair(valueNames, valueObjects, secondaryKey);
         }
         else
@@ -352,6 +353,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         }
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public <T> Transaction commit(Transaction transaction, T object, Class<T> type)
             throws DataSourceException, DataObjectInterpretationException
@@ -365,6 +367,14 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
         for(ValueObject value : dataObject.getValues().values())
             putValue(values, object, value, "Null value (" + value.getName() + ") when @NotNull declared");
+
+        Pair<String, DataArgument>[] valueArray = values.toArray(new Pair[values.size()]);
+
+        try {
+            manipulator.insert(connection, tableName, valueArray);
+        } catch (SQLException e) {
+            throw new DataSourceException("SQLException", e);
+        }
 
         return transaction == null ? new TransactionImpl() : transaction;
     }
@@ -581,6 +591,10 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
     private static class KeyInjection
     {
+        KeyInjection()
+        {
+        }
+
         void inject(Object object)
         {
             for(Pair<ValueObject, Object> entry : injectiveElements)

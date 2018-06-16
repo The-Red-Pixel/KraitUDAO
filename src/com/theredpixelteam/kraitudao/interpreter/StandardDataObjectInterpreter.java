@@ -1210,6 +1210,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         {
             this.type = type;
             this.secondaryKeys = new HashMap<>();
+            this.values = new HashMap<>();
         }
 
         @Override
@@ -1225,6 +1226,8 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
                 case PRIMARY:
                     if(this.primaryKey != null)
                         throw new DataObjectMalformationException("Duplicated primary key");
+                    this.primaryKey = valueObject;
+                    break;
 
                 case SECONDARY:
                     if((secondaryKeys.putIfAbsent(valueObject.getName(), valueObject)) != null)
@@ -1237,7 +1240,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         {
             this.checkSeal();
 
-            if(primaryKey.getName().equals(valueObject.getName())
+            if((primaryKey != null && primaryKey.getName().equals(valueObject.getName()))
                     || secondaryKeys.containsKey(valueObject.getName())
                     || (values.putIfAbsent(valueObject.getName(), valueObject)) != null)
                 throw new DataObjectMalformationException("Duplicated value object: " + valueObject.getName());
