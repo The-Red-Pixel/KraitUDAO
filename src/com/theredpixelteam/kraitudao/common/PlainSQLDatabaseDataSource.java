@@ -418,7 +418,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     }
 
     @Override
-    public <T> Transaction clear(Transaction transaction) throws DataSourceException
+    public Transaction clear(Transaction transaction) throws DataSourceException
     {
         checkTransaction(transaction);
 
