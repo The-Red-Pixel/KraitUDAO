@@ -110,13 +110,13 @@ public final class DataSourceUtil {
         }
 
         @Override
-        public synchronized <T> Transaction clear() throws DataSourceException
+        public synchronized Transaction clear() throws DataSourceException
         {
             return new SynchronizedTransaction(this.object.clear());
         }
 
         @Override
-        public synchronized <T> Transaction clear(Transaction transition) throws DataSourceException
+        public synchronized Transaction clear(Transaction transition) throws DataSourceException
         {
             return this.object.clear(transition);
         }

@@ -91,16 +91,16 @@ public class DefaultDataExtractorFactory implements DataExtractorFactory {
     private static final Map<Class<?>, DirectableDataExtractor> MAPPED = new HashMap<Class<?>, DirectableDataExtractor>()
     {
         {
-            put(boolean.class, (r, n, i, u) -> u ? r.getBoolean(i) : r.getBoolean(n));
-            put(byte.class, (r, n, i, u) -> (u ? r.getBytes(i) : r.getBytes(n))[0]);
-            put(char.class, (r, n, i, u) -> readSilently(u ? r.getNCharacterStream(i) : r.getNCharacterStream(n)));
-            put(short.class, (r, n, i, u) -> u ? r.getShort(i) : r.getShort(n));
-            put(int.class, (r, n, i, u) -> u ? r.getInt(i) : r.getInt(n));
-            put(long.class, (r, n, i, u) -> u ? r.getLong(i) : r.getLong(n));
-            put(float.class, (r, n, i, u) -> u ? r.getFloat(i) : r.getFloat(n));
-            put(double.class, (r, n, i, u) -> u ? r.getDouble(i) : r.getDouble(n));
-            put(String.class, (r, n, i, u) -> u ? r.getNString(i) : r.getNString(n));
-            put(BigDecimal.class, (r, n, i, u) -> u ? r.getBigDecimal(i) : r.getBigDecimal(n));
+            put(boolean.class,      (r, n, i, u) -> u ? r.getBoolean(i) : r.getBoolean(n));
+            put(byte.class,         (r, n, i, u) -> (u ? r.getBytes(i) : r.getBytes(n))[0]);
+            put(char.class,         (r, n, i, u) -> readSilently(u ? r.getNCharacterStream(i) : r.getNCharacterStream(n)));
+            put(short.class,        (r, n, i, u) -> u ? r.getShort(i) : r.getShort(n));
+            put(int.class,          (r, n, i, u) -> u ? r.getInt(i) : r.getInt(n));
+            put(long.class,         (r, n, i, u) -> u ? r.getLong(i) : r.getLong(n));
+            put(float.class,        (r, n, i, u) -> u ? r.getFloat(i) : r.getFloat(n));
+            put(double.class,       (r, n, i, u) -> u ? r.getDouble(i) : r.getDouble(n));
+            put(String.class,       (r, n, i, u) -> u ? r.getNString(i) : r.getNString(n));
+            put(BigDecimal.class,   (r, n, i, u) -> u ? r.getBigDecimal(i) : r.getBigDecimal(n));
         }
     };
 
