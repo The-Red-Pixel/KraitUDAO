@@ -28,6 +28,7 @@ import com.theredpixelteam.kraitudao.annotations.inheritance.*;
 import com.theredpixelteam.kraitudao.annotations.metadata.ExpandedName;
 import com.theredpixelteam.kraitudao.annotations.metadata.Metadata;
 import com.theredpixelteam.kraitudao.annotations.metadata.MetadataCollection;
+import com.theredpixelteam.kraitudao.annotations.metadata.common.IgnoreWhenEquals;
 import com.theredpixelteam.kraitudao.dataobject.*;
 import com.theredpixelteam.redtea.predication.MultiCondition;
 import com.theredpixelteam.redtea.predication.MultiPredicate;
@@ -1391,6 +1392,11 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
 
             if(!(type.isInstance(object)))
                 throw new DataObjectError(DataObjectException.IncapableType(returned.getClass(), type));
+
+            Optional<IgnoreWhenEquals> ignoreWhenEquals = getMetadata(IgnoreWhenEquals.class);
+            if(ignoreWhenEquals.isPresent()
+                    && returned.toString().equals(ignoreWhenEquals.get().value()))
+                return null;
 
             return (T) object;
         }
