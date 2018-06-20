@@ -107,338 +107,57 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         return this.tableName;
     }
 
-    private void putValue(List<Pair<String, DataArgument>> list,
-                          Object object,
-                          ValueObject valueObject,
-                          String msgOnNull)
-            throws DataSourceException
+    private void checkTransaction(Transaction transaction) throws DataSourceException
     {
-        putArgument0(list, object, valueObject, msgOnNull, valueObject.getMetadata(NotNull.class).isPresent(), null);
+        if((transaction == null && this.currentTransaction != null)
+                || (transaction != null && !transaction.equals(this.currentTransaction)))
+            throw new DataSourceException.Busy();
     }
 
-    private boolean putArgument0(List<Pair<String, DataArgument>> list,
-                                 Object object,
-                                 ValueObject valueObject,
-                                 String msgOnNull,
-                                 boolean nonNull,
-                                 KeyInjection injection)
-            throws DataSourceException
-    {
-        Object value = valueObject.get(object);
-
-        if(value == null)
-            if(nonNull)
-                throw new DataSourceException(msgOnNull);
-            else
-                return false;
-        else {
-            list.add(Pair.of(valueObject.getName(), argumentWrapper.wrap(value)
-                    .orElseThrow(() -> new DataSourceException.UnsupportedValueType(valueObject.getType().getCanonicalName()))));
-
-            if(injection != null)
-                injection.injectiveElements.add(Pair.of(valueObject, value));
-        }
-
-        return true;
-    }
-
-    private void extract(Object object, Collection<ValueObject> valueObjects, ResultSet resultSet)
-            throws DataSourceException.UnsupportedValueType, SQLException
-    {
-        for (ValueObject valueObject : valueObjects)
-            valueObject.set(object, extractorFactory.create(valueObject.getType(), valueObject.getName())
-                    .orElseThrow(() -> new DataSourceException.UnsupportedValueType(valueObject.getType().getCanonicalName()))
-                    .extract(resultSet));
-    }
-
-    private void putKeys(List<Pair<String, DataArgument>> list,
-                         DataObject dataObject,
-                         Object object,
-                         String[] msgOnNull)
-            throws DataSourceException, DataObjectInterpretationException
-    {
-        putKeys0(list, dataObject, object,null, null, msgOnNull, true, null);
-    }
-
-    private void putKeysIfNotNull(List<Pair<String, DataArgument>> list,
-                                  DataObject dataObject,
-                                  Object object,
-                                  List<String> valueNames,
-                                  List<ValueObject> valueObjects,
-                                  KeyInjection keyInjection)
-            throws DataSourceException, DataObjectInterpretationException
-    {
-        putKeys0(list, dataObject, object, valueNames, valueObjects, null, false, keyInjection);
-    }
-
-    private void putKeys0(List<Pair<String, DataArgument>> list,
-                          DataObject dataObject,
-                          Object object,
-                          List<String> valueNames,
-                          List<ValueObject> valueObjects,
-                          String[] msgOnNull,
-                          boolean forceNonNull,
-                          KeyInjection keyInjection)
-            throws DataSourceException, DataObjectInterpretationException
-    {
-        if(msgOnNull == null)
-            msgOnNull = EMPTY_ARRAY;
-
-        if(dataObject instanceof UniqueDataObject)
-        {
-            UniqueDataObject uniqueDataObject = (UniqueDataObject) dataObject;
-            ValueObject key = uniqueDataObject.getKey();
-
-            if(!putArgument0(list, object, key, msgOnNull[0], forceNonNull, keyInjection))
-                putListPair(valueNames, valueObjects, key);
-        }
-        else if(dataObject instanceof MultipleDataObject)
-        {
-            MultipleDataObject multipleDataObject = (MultipleDataObject) dataObject;
-            ValueObject primaryKey = multipleDataObject.getPrimaryKey();
-            Collection<ValueObject> secondaryKeys = multipleDataObject.getSecondaryKeys().values();
-
-            if(!putArgument0(list, object, primaryKey, msgOnNull[1], true, keyInjection))
-                putListPair(valueNames, valueObjects, primaryKey);
-
-            for(ValueObject secondaryKey : secondaryKeys)
-                if(!putArgument0(list, object, secondaryKey, msgOnNull[2], forceNonNull, keyInjection))
-                    putListPair(valueNames, valueObjects, secondaryKey);
-        }
-        else
-            throw new DataObjectMalformationException.IllegalType();
-    }
-
-    private static void putListPair(List<String> valueNames, List<ValueObject> valueObjects, ValueObject valueObject)
-    {
-        if (valueNames != null)
-            valueNames.add(valueObject.getName());
-
-        if (valueObjects != null)
-            valueObjects.add(valueObject);
-    }
-
-    @SuppressWarnings("unchecked")
     @Override
     public <T> boolean pull(T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException
     {
-        DataObject dataObject = container.interpretIfAbsent(type, interpreter);
-
-        List<Pair<String, DataArgument>> keys = new ArrayList<>();
-
-        putKeys(keys, dataObject, object, MSG_ON_NULL_ARRAY);
-
-        Map<String, ValueObject> values = dataObject.getValues();
-        Collection<String> valueNames = values.keySet();
-
-        Pair<String, DataArgument>[] keyArray = keys.toArray(new Pair[keys.size()]);
-        String[] nameArray = valueNames.toArray(new String[valueNames.size()]);
-
-        try(ResultSet resultSet = manipulator.query(connection, tableName, keyArray, nameArray)) {
-            if(!resultSet.next())
-                return false;
-
-            if (!resultSet.isLast())
-                throw new DataSourceException("Multiple record found");
-
-            extract(object, values.values(), resultSet);
-        } catch (SQLException e) {
-            throw new DataSourceException("SQLException", e);
-        }
-
-        return true;
+        return false;
     }
 
     @Override
     public <T> Collection<T> pull(Class<T> type) throws DataSourceException, DataObjectInterpretationException
     {
-        DataObject dataObject = container.interpretIfAbsent(type, interpreter);
-
-        List<String> valueNames = new ArrayList<>();
-        List<ValueObject> valueObjects = new ArrayList<>();
-
-        if(dataObject instanceof UniqueDataObject)
-        {
-            UniqueDataObject uniqueDataObject = (UniqueDataObject) dataObject;
-            ValueObject key = uniqueDataObject.getKey();
-
-            valueNames.add(key.getName());
-            valueObjects.add(key);
-        }
-        else if(dataObject instanceof MultipleDataObject)
-        {
-            MultipleDataObject multipleDataObject = (MultipleDataObject) dataObject;
-            ValueObject primaryKey = multipleDataObject.getPrimaryKey();
-            Map<String, ValueObject> secondaryKeys = multipleDataObject.getSecondaryKeys();
-
-            valueNames.add(primaryKey.getName());
-            valueObjects.add(primaryKey);
-
-            for(Map.Entry<String, ValueObject> entry : secondaryKeys.entrySet())
-            {
-                valueNames.add(entry.getKey());
-                valueObjects.add(entry.getValue());
-            }
-        }
-
-        Map<String, ValueObject> values = dataObject.getValues();
-        for(Map.Entry<String, ValueObject> entry : values.entrySet())
-        {
-            valueNames.add(entry.getKey());
-            valueObjects.add(entry.getValue());
-        }
-
-        String[] valueArray = valueNames.toArray(new String[valueNames.size()]);
-
-        try(ResultSet resultSet = manipulator.query(connection, tableName, null, valueArray)) {
-            if(!resultSet.next())
-                return Collections.emptyList();
-
-            List<T> objects = new ArrayList<>();
-
-            do {
-                T object = type.newInstance();
-
-                extract(object, valueObjects, resultSet);
-
-                objects.add(object);
-            } while(resultSet.next());
-
-            return objects;
-        } catch (SQLException e) {
-            throw new DataSourceException("SQLException", e);
-        } catch (InstantiationException | IllegalAccessException e) {
-            throw new DataSourceException("Reflection Exception", e);
-        }
+        return null;
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public <T> Collection<T> pullVaguely(T object, Class<T> type)
             throws DataSourceException, DataObjectInterpretationException
     {
-        DataObject dataObject = container.interpretIfAbsent(type, interpreter);
-
-        List<Pair<String, DataArgument>> keys = new ArrayList<>();
-        List<String> valueNames = new ArrayList<>();
-        List<ValueObject> valueObjects = new ArrayList<>();
-
-        KeyInjection keyInjection = new KeyInjection();
-
-        putKeysIfNotNull(keys, dataObject, object, valueNames, valueObjects, keyInjection);
-
-        for(ValueObject valueObject : dataObject.getValues().values())
-            putListPair(valueNames, valueObjects, valueObject);
-
-        Pair<String, DataArgument>[] keyArray = keys.toArray(new Pair[keys.size()]);
-        String[] valueArray = valueNames.toArray(new String[valueNames.size()]);
-
-        try (ResultSet resultSet = manipulator.query(connection, tableName, keyArray, valueArray)) {
-            if(!resultSet.next())
-                return Collections.emptyList();
-
-            List<T> objects = new ArrayList<>();
-
-            do {
-                T obj = type.newInstance();
-
-                keyInjection.inject(obj);
-                extract(obj, valueObjects, resultSet);
-
-                objects.add(obj);
-            } while (resultSet.next());
-
-            return objects;
-        } catch (SQLException e) {
-            throw new DataSourceException("SQLException", e);
-        } catch (InstantiationException | IllegalAccessException e) {
-            throw new DataSourceException("Reflection Exception", e);
-        }
+        return null;
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public <T> Transaction commit(Transaction transaction, T object, Class<T> type)
             throws DataSourceException, DataObjectInterpretationException
     {
-        checkTransaction(transaction);
-
-        DataObject dataObject = container.interpretIfAbsent(type, interpreter);
-        List<Pair<String, DataArgument>> values = new ArrayList<>();
-
-        putKeys(values, dataObject, object, MSG_ON_NULL_ARRAY);
-
-        for(ValueObject value : dataObject.getValues().values())
-            putValue(values, object, value, "Null value (" + value.getName() + ") when @NotNull declared");
-
-        Pair<String, DataArgument>[] valueArray = values.toArray(new Pair[values.size()]);
-
-        try {
-            manipulator.insert(connection, tableName, valueArray);
-        } catch (SQLException e) {
-            throw new DataSourceException("SQLException", e);
-        }
-
-        return transaction == null ? new TransactionImpl() : transaction;
+        return null;
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public <T> Transaction remove(Transaction transaction, T object, Class<T> type)
             throws DataSourceException, DataObjectInterpretationException
     {
-        return remove0(transaction, object, type, false);
+        return null;
+    }
+
+    @Override
+    public Transaction clear(Transaction transaction) throws DataSourceException
+    {
+        return null;
     }
 
     @Override
     public <T> Transaction removeVaguely(Transaction transaction, T object, Class<T> type)
             throws DataSourceException, DataObjectInterpretationException
     {
-        return remove0(transaction, object, type, true);
-    }
-
-    @SuppressWarnings("unchecked")
-    private <T> Transaction remove0(Transaction transaction, T object, Class<T> type, boolean vaguely)
-            throws DataSourceException, DataObjectInterpretationException
-    {
-        checkTransaction(transaction);
-
-        DataObject dataObject = container.interpretIfAbsent(type, interpreter);
-        List<Pair<String, DataArgument>> keys = new ArrayList<>();
-
-        if(vaguely)
-            putKeysIfNotNull(keys, dataObject, object, null, null, null);
-        else
-            putKeys(keys, dataObject, object, MSG_ON_NULL_ARRAY);
-
-        try {
-            manipulator.delete(connection, tableName, keys.toArray(new Pair[keys.size()]));
-        } catch (SQLException e) {
-            throw new DataSourceException("SQLException", e);
-        }
-
-        return transaction == null ? new TransactionImpl() : transaction;
-    }
-
-    @Override
-    public Transaction clear(Transaction transaction) throws DataSourceException
-    {
-        checkTransaction(transaction);
-
-        try {
-            manipulator.delete(connection, tableName, null);
-        } catch (SQLException e) {
-            throw new DataSourceException("SQLException", e);
-        }
-
-        return transaction == null ? new TransactionImpl() : transaction;
-    }
-
-    private void checkTransaction(Transaction transaction) throws DataSourceException
-    {
-        if((transaction == null && this.currentTransaction != null)
-                || (transaction != null && !transaction.equals(this.currentTransaction)))
-            throw new DataSourceException.Busy();
+        return null;
     }
 
     @Override
@@ -526,10 +245,6 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     protected DataArgumentWrapper argumentWrapper;
 
     protected DataExtractorFactory extractorFactory;
-
-    private static final String[] MSG_ON_NULL_ARRAY = new String[] {"Null key", "Null primary key", "Null secondary key"};
-
-    private static final String[] EMPTY_ARRAY = new String[] {null, null, null};
 
     private class TransactionImpl implements Transaction
     {
