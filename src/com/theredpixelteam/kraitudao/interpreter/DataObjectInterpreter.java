@@ -22,6 +22,7 @@
 package com.theredpixelteam.kraitudao.interpreter;
 
 import com.theredpixelteam.kraitudao.dataobject.DataObject;
+import com.theredpixelteam.kraitudao.dataobject.ElementDataObject;
 import com.theredpixelteam.kraitudao.dataobject.MultipleDataObject;
 import com.theredpixelteam.kraitudao.dataobject.UniqueDataObject;
 
@@ -41,11 +42,18 @@ public interface DataObjectInterpreter {
         return getUnique(object.getClass());
     }
 
+    public default ElementDataObject getElement(Object object) throws DataObjectInterpretationException
+    {
+        return getElement(object.getClass());
+    }
+
     public DataObject get(Class<?> type) throws DataObjectInterpretationException;
 
     public MultipleDataObject getMultiple(Class<?> type) throws DataObjectInterpretationException;
 
     public UniqueDataObject getUnique(Class<?> type) throws DataObjectInterpretationException;
+
+    public ElementDataObject getElement(Class<?> type) throws DataObjectInterpretationException;
 
     public DataObject expand(DataObject dataObject) throws DataObjectInterpretationException;
 }

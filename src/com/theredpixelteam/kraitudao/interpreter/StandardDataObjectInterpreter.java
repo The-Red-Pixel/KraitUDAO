@@ -56,22 +56,29 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
     {
         Objects.requireNonNull(type, "type");
 
-        int i = (type.getAnnotation(Unique.class) == null ? 0b00 : 0b01)
-                | (type.getAnnotation(Multiple.class) == null ? 0b00 : 0b10);
+        int i = (type.getAnnotation(Unique.class) == null ? 0b000 : 0b001)
+                | (type.getAnnotation(Multiple.class) == null ? 0b000 : 0b010)
+                | (type.getAnnotation(Element.class) == null ? 0b000 : 0b100);
 
         switch(i)
         {
-            case 0b00: // not annotated
-                throw new DataObjectInterpretationException("Metadata annotation not found in type: " + type.getCanonicalName());
+            case 0b000: // not annotated
+                throw new DataObjectMalformationException("Metadata annotation not found in type: " + type.getCanonicalName());
 
-            case 0b01: // only annotated by @Unique
+            case 0b001: // only annotated by @Unique
                 return getUnique0(type);
 
-            case 0b10: // only annotated by @Multiple
+            case 0b010: // only annotated by @Multiple
                 return getMultiple0(type);
 
-            case 0b11: // both annotated
-                throw new DataObjectInterpretationException("Duplicated metadata annotation in type: " + type.getCanonicalName());
+            case 0b100: // only annotated by @Element
+                return getElement0(type);
+
+            case 0b011: // both annotated
+            case 0b101:
+            case 0b110:
+            case 0b111:
+                throw new DataObjectMalformationException("Duplicated metadata annotation in type: " + type.getCanonicalName());
         }
 
         throw new IllegalStateException("Should not reach here");
@@ -83,7 +90,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         Objects.requireNonNull(type, "type");
 
         if(type.getAnnotation(Multiple.class) == null)
-            throw new DataObjectInterpretationException("Type: " + type.getCanonicalName() + " is not annotated by @Multiple");
+            throw new DataObjectMalformationException("Type: " + type.getCanonicalName() + " is not annotated by @Multiple");
 
         return getMultiple0(type);
     }
@@ -94,9 +101,20 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         Objects.requireNonNull(type, "type");
 
         if(type.getAnnotation(Unique.class) == null)
-            throw new DataObjectInterpretationException("Type: " + type.getCanonicalName() + " is not annotated by @Unique");
+            throw new DataObjectMalformationException("Type: " + type.getCanonicalName() + " is not annotated by @Unique");
 
         return getUnique0(type);
+    }
+
+    @Override
+    public ElementDataObject getElement(Class<?> type) throws DataObjectInterpretationException
+    {
+        Objects.requireNonNull(type, "type");
+
+        if(type.getAnnotation(Element.class) == null)
+            throw new DataObjectMalformationException("Type: " + type.getCanonicalName() + " is not annotated by @Element");
+
+        return getElement0(type);
     }
 
     @Override
@@ -287,6 +305,16 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
     private UniqueDataObject getUnique0(Class<?> type) throws DataObjectInterpretationException
     {
         UniqueDataObjectContainer container = new UniqueDataObjectContainer(type);
+
+        parse(type, container, type.getAnnotation(Inheritance.class) != null, true);
+        container.seal();
+
+        return container;
+    }
+
+    private ElementDataObject getElement0(Class<?> type) throws DataObjectInterpretationException
+    {
+        ElementDataObjectContainer container = new ElementDataObjectContainer(type);
 
         parse(type, container, type.getAnnotation(Inheritance.class) != null, true);
         container.seal();
@@ -1113,6 +1141,77 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
     {
     }
 
+    private static class ElementDataObjectContainer implements ElementDataObject, DataObjectContainer
+    {
+        ElementDataObjectContainer(Class<?> type)
+        {
+            this.values = new HashMap<>();
+            this.type = type;
+        }
+
+        @Override
+        public void putKey(KeyType type, ValueObject valueObject)
+                throws DataObjectInterpretationException
+        {
+            throw new DataObjectMalformationException("Any key (@Key, @PrimaryKey or @SecondaryKey) is not allowed in an element data object");
+        }
+
+        @Override
+        public void putValue(ValueObject valueObject) throws DataObjectInterpretationException
+        {
+            this.checkSeal();
+
+            if(values.putIfAbsent(valueObject.getName(), valueObject) != null)
+                throw new DataObjectMalformationException("Duplicated value object: " + valueObject.getName());
+        }
+
+        @Override
+        public void seal()
+        {
+            this.checkSeal();
+
+            this.values = Collections.unmodifiableMap(values);
+
+            this.sealed = true;
+        }
+
+        @Override
+        public boolean sealed()
+        {
+            return sealed;
+        }
+
+        @Override
+        public Optional<ValueObject> getValue(String name)
+        {
+            return Optional.ofNullable(values.get(name));
+        }
+
+        @Override
+        public Optional<ValueObject> getValueObject(String name)
+        {
+            return getValue(name);
+        }
+
+        @Override
+        public Map<String, ValueObject> getValues()
+        {
+            return values;
+        }
+
+        @Override
+        public Class<?> getType()
+        {
+            return type;
+        }
+
+        final Class<?> type;
+
+        Map<String, ValueObject> values;
+
+        private boolean sealed;
+    }
+
     private static class UniqueDataObjectContainer implements UniqueDataObject, DataObjectContainer
     {
         UniqueDataObjectContainer(Class<?> type)
@@ -1393,17 +1492,20 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             if(!(type.isInstance(object)))
                 throw new DataObjectError(DataObjectException.IncapableType(returned.getClass(), type));
 
-            Optional<IgnoreWhenEquals> ignoreWhenEquals = getMetadata(IgnoreWhenEquals.class);
-            if(ignoreWhenEquals.isPresent()
-                    && returned.toString().equals(ignoreWhenEquals.get().value()))
-                return null;
-
             return (T) object;
         }
 
         Object get0(Object object)
         {
-            return getter.get(object);
+            Object returned = getter.get(object);
+
+            Optional<IgnoreWhenEquals> ignoreWhenEquals = getMetadata(IgnoreWhenEquals.class);
+            System.out.println(getName() + ":" + ignoreWhenEquals.isPresent());
+            if(ignoreWhenEquals.isPresent()
+                    && returned.toString().equals(ignoreWhenEquals.get().value()))
+                return null;
+
+            return returned;
         }
 
         @Override

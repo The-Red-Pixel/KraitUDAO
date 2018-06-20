@@ -327,6 +327,9 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
         putKeysIfNotNull(keys, dataObject, object, valueNames, valueObjects, keyInjection);
 
+        for(ValueObject valueObject : dataObject.getValues().values())
+            putListPair(valueNames, valueObjects, valueObject);
+
         Pair<String, DataArgument>[] keyArray = keys.toArray(new Pair[keys.size()]);
         String[] valueArray = valueNames.toArray(new String[valueNames.size()]);
 
