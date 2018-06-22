@@ -21,13 +21,7 @@
 
 package com.theredpixelteam.kraitudao.common.sql;
 
-import com.theredpixelteam.kraitudao.annotations.metadata.common.NotNull;
-import com.theredpixelteam.kraitudao.annotations.metadata.common.Precision;
-import com.theredpixelteam.kraitudao.annotations.metadata.common.Size;
-import com.theredpixelteam.kraitudao.dataobject.*;
-import com.theredpixelteam.kraitudao.misc.TypeUtil;
 import com.theredpixelteam.redtea.util.Pair;
-import com.theredpixelteam.redtea.util.VaguePair;
 import com.theredpixelteam.redtea.util.Vector3;
 
 import java.io.InputStream;
