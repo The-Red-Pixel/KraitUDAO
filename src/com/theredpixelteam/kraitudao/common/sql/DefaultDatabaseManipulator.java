@@ -28,6 +28,7 @@ import com.theredpixelteam.kraitudao.dataobject.*;
 import com.theredpixelteam.kraitudao.misc.TypeUtil;
 import com.theredpixelteam.redtea.util.Pair;
 import com.theredpixelteam.redtea.util.VaguePair;
+import com.theredpixelteam.redtea.util.Vector3;
 
 import java.io.InputStream;
 import java.io.Reader;
@@ -42,152 +43,46 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
     public ResultSet query(Connection connection, String tableName, Pair<String, DataArgument>[] keys, String[] values)
             throws SQLException
     {
-        PreparedStatement preparedStatement = connection.prepareStatement(
-                "SELECT " + combine(values, ",", "*") +
-                        " FROM " + tableName +
-                        " WHERE " + narrow(keys));
-
-        if(keys != null)
-            for(int i = 0; i < keys.length;)
-                keys[i].second().apply(preparedStatement, ++i);
-
-        return preparedStatement.executeQuery();
+        return null;
     }
 
     @Override
     public int delete(Connection connection, String tableName, Pair<String, DataArgument>[] keysAndValues)
             throws SQLException
     {
-        PreparedStatement preparedStatement = connection.prepareStatement(
-                "DELETE FROM " + tableName +
-                        " WHERE " + narrow(keysAndValues));
-
-        if(keysAndValues != null)
-            for(int i = 0; i < keysAndValues.length;)
-                keysAndValues[i].second().apply(preparedStatement, ++i);
-
-        int n = preparedStatement.executeUpdate();
-
-        preparedStatement.close();
-
-        return n;
+        return 0;
     }
 
     @Override
-    public int insert(Connection connection, String tableName, Pair<String, DataArgument>[] values)
+    public int insert(Connection connection, String tableName, Pair<String, DataArgument>[] values) throws SQLException
+    {
+        return 0;
+    }
+
+    @Override
+    public void createTable(Connection connection, String tableName, Vector3<String, Class<?>, Constraint>[] columns, Constraint[] tableConstraints)
             throws SQLException
     {
-        if(values == null || values.length == 0)
-            return 0;
 
-        VaguePair.applyAll(values, VaguePair.STRING_FIRST_ONLY);
-
-        PreparedStatement preparedStatement = connection.prepareStatement(
-                "MERGE INTO " + tableName +
-                        " KEY (" + combine(values, ",", null) + ")" +
-                        " VALUES (" + arguments(values.length) + ")");
-
-        for(int i = 0; i < values.length;)
-            values[i].second().apply(preparedStatement, ++i);
-
-        int n = preparedStatement.executeUpdate();
-
-        preparedStatement.close();
-
-        return n;
     }
 
     @Override
-    public void createTable(Connection connection, String tableName, DataObject dataObject)
-            throws SQLException {
-        createTable0(connection, "CREATE TABLE " + tableName, dataObject);
+    public boolean createTableIfNotExists(Connection connection, String tableName, Vector3<String, Class<?>, Constraint>[] columns, Constraint[] tableConstraints)
+            throws SQLException
+    {
+        return false;
     }
 
     @Override
-    public boolean createTableIfNotExists(Connection connection, String tableName, DataObject dataObject)
-            throws SQLException {
-        return createTable0(connection, "CREATE TABLE IF NOT EXISTS " + tableName, dataObject) != 0;
+    public void dropTable(Connection connection, String tableName) throws SQLException
+    {
+
     }
 
-    private static int createTable0(Connection connection, String statement, DataObject dataObject) throws SQLException
+    @Override
+    public boolean dropTableIfExists(Connection connection, String tableName) throws SQLException
     {
-        StringBuilder stmt = new StringBuilder(statement).append(" (");
-        StringBuilder constraint = new StringBuilder();
-
-        if(dataObject instanceof UniqueDataObject)
-        {
-            UniqueDataObject uniqueDataObject = (UniqueDataObject) dataObject;
-            ValueObject key = uniqueDataObject.getKey();
-
-            appendTableElement(stmt, key);
-
-            constraint.append("CONSTRAINT CONSTRAINT_PRIMARY_KEY PRIMARY KEY (").append(key.getName()).append(")");
-        }
-        else if(dataObject instanceof MultipleDataObject)
-        {
-            MultipleDataObject multipleDataObject = (MultipleDataObject) dataObject;
-            ValueObject primaryKey = multipleDataObject.getPrimaryKey();
-
-            appendTableElement(stmt, primaryKey);
-
-
-            constraint.append("CONSTRAINT CONSTRAINT_PRIMARY_KEY PRIMARY KEY (").append(primaryKey.getName()).append(",");
-
-            Collection<ValueObject> valueObjectCollection = multipleDataObject.getSecondaryKeys().values();
-            int valueObjectCollectionSize = valueObjectCollection.size(), i = 0;
-            for(ValueObject secondaryKey : multipleDataObject.getSecondaryKeys().values())
-            {
-                appendTableElement(stmt, secondaryKey);
-
-                constraint.append(secondaryKey.getName());
-
-                if(++i < valueObjectCollectionSize)
-                    constraint.append(",");
-            }
-
-            constraint.append(")");
-        }
-        else
-            throw new DataObjectException("Illegal or unsupported data object type");
-
-        for(ValueObject valueObject : dataObject.getValues().values())
-            appendTableElement(stmt, valueObject);
-
-        stmt.append(constraint).append(")");
-
-        PreparedStatement preparedStatement = connection.prepareStatement(stmt.toString());
-        int n = preparedStatement.executeUpdate();
-
-        preparedStatement.close();
-
-        return n;
-    }
-
-
-    private static TypeDecorator of(TypeDecorator... decorators)
-    {
-        final TypeDecorator[] sequence = decorators;
-        return (type, valueObject) -> {
-            for(TypeDecorator decorator : sequence)
-                type = decorator.decorate(type, valueObject);
-
-            return type;
-        };
-    }
-
-    private static void appendTableElement(StringBuilder stmt, ValueObject valueObject)
-    {
-        Class<?> type = TypeUtil.tryToUnbox(valueObject.getType());
-        String typeString = MAPPING.get(type);
-
-        if(typeString == null)
-            throw new DataObjectException("Unsupported type: " + type.getCanonicalName() + " (PLEASE Try to use expandable value)");
-
-        TypeDecorator typeDecorator = TYPE_DECORATORS.get(type);
-        if(typeDecorator != null)
-            typeString = typeDecorator.decorate(typeString, valueObject);
-
-        stmt.append(valueObject.getName()).append(" ").append(typeString).append(",");
+        return false;
     }
 
     protected static String arguments(int count)
@@ -238,8 +133,6 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
 
     public static final DatabaseManipulator INSTANCE = new DefaultDatabaseManipulator();
 
-
-
     private static final Map<Class<?>, String> MAPPING = new HashMap<Class<?>, String>() {
         {
             //  Java type        |  SQL type
@@ -255,61 +148,6 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
             put(BigDecimal.class,   "DECIMAL");
         }
     };
-
-    private static final Map<Class<?>, TypeDecorator> TYPE_DECORATORS = new HashMap<Class<?>, TypeDecorator>() {
-        {
-            TypeDecorator notNullDecorator = (type, valueObject) -> {
-                Optional<NotNull> metadata = valueObject.getMetadata(NotNull.class);
-
-                if(!metadata.isPresent() && !valueObject.isKey())
-                    return type;
-                else
-                    return type + " NOT NULL";
-            };
-
-            TypeDecorator integerPrecisionDecorator = of((type, valueObject) -> {
-                Optional<Precision> metadata = valueObject.getMetadata(Precision.class);
-
-                if(!metadata.isPresent())
-                    return type;
-                else
-                    return type + "(" + metadata.get().integer() + ")";
-            }, notNullDecorator);
-
-            TypeDecorator decimalPrecisionDecorator = of((type, valueObject) -> {
-                Optional<Precision> metadata = valueObject.getMetadata(Precision.class);
-
-                if(!metadata.isPresent())
-                    return type;
-
-                Precision precision = metadata.get();
-
-                return type + "(" + precision.integer() + "," + precision.decimal() + ")";
-            }, notNullDecorator);
-
-            put(String.class, of((type, valueObject) -> {
-                Optional<Size> metadata = valueObject.getMetadata(Size.class);
-
-                if(!metadata.isPresent())
-                    return type;
-                else
-                    return type + "(" + metadata.get().value() + ")";
-            }, notNullDecorator));
-
-            put(short.class, integerPrecisionDecorator);
-            put(int.class, integerPrecisionDecorator);
-            put(long.class, integerPrecisionDecorator);
-
-            put(float.class, decimalPrecisionDecorator);
-            put(double.class, decimalPrecisionDecorator);
-            put(BigDecimal.class, decimalPrecisionDecorator);
-        }
-    };
-
-    private interface TypeDecorator
-    {
-        String decorate(String type, ValueObject valueObject);
-    }
 
     protected static class ResultSetFromDisposableStatement implements ResultSet {
         protected ResultSetFromDisposableStatement(ResultSet resultSet)

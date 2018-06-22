@@ -21,77 +21,32 @@
 
 package com.theredpixelteam.kraitudao.common.sql;
 
-import com.theredpixelteam.kraitudao.common.DataObjectCache;
-import com.theredpixelteam.kraitudao.dataobject.DataObject;
-import com.theredpixelteam.kraitudao.dataobject.DataObjectContainer;
-import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
-import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
-import com.theredpixelteam.kraitudao.interpreter.StandardDataObjectInterpreter;
 import com.theredpixelteam.redtea.util.Pair;
+import com.theredpixelteam.redtea.util.Vector3;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
 public interface DatabaseManipulator {
-    public ResultSet query(Connection connection,
-                           String tableName,
-                           Pair<String, DataArgument>[] keys, String[] values)
+    public ResultSet query(Connection connection, String tableName, Pair<String, DataArgument>[] keys, String[] values)
             throws SQLException;
 
-    public int delete(Connection connection,
-                      String tableName,
-                      Pair<String, DataArgument>[] keysAndValues)
+    public int delete(Connection connection, String tableName, Pair<String, DataArgument>[] keysAndValues)
             throws SQLException;
 
-    public int insert(Connection connection,
-                      String tableName,
-                      Pair<String, DataArgument>[] values)
+    public int insert(Connection connection, String tableName, Pair<String, DataArgument>[] values)
             throws SQLException;
 
-    public void createTable(Connection connection,
-                            String tableName,
-                            DataObject dataObject)
+    public void createTable(Connection connection, String tableName, Vector3<String, Class<?>, Constraint>[] columns, Constraint[] tableConstraints)
             throws SQLException;
 
-    public default void createTable(Connection connection,
-                                    String tableName,
-                                    Class<?> dataType,
-                                    DataObjectContainer container,
-                                    DataObjectInterpreter interpreter)
-            throws SQLException, DataObjectInterpretationException
-    {
-        createTable(connection, tableName, container.interpretIfAbsent(dataType, interpreter));
-    }
-
-    public default void createTable(Connection connection,
-                                    String tableName,
-                                    Class<?> dataType)
-            throws SQLException, DataObjectInterpretationException
-    {
-        createTable(connection, tableName, dataType, DataObjectCache.getGlobal(), StandardDataObjectInterpreter.INSTANCE);
-    }
-
-    public boolean createTableIfNotExists(Connection connection,
-                                          String tableName,
-                                          DataObject dataObject)
+    public boolean createTableIfNotExists(Connection connection, String tableName, Vector3<String, Class<?>, Constraint>[] columns, Constraint[] tableConstraints)
             throws SQLException;
 
-    public default boolean createTableIfNotExists(Connection connection,
-                                                  String tableName,
-                                                  Class<?> dataType,
-                                                  DataObjectContainer container,
-                                                  DataObjectInterpreter interpreter)
-            throws SQLException, DataObjectInterpretationException
-    {
-        return createTableIfNotExists(connection, tableName, container.interpretIfAbsent(dataType, interpreter));
-    }
+    public void dropTable(Connection connection, String tableName)
+            throws SQLException;
 
-    public default boolean createTableIfNotExists(Connection connection,
-                                                  String tableName,
-                                                  Class<?> dataType)
-            throws SQLException, DataObjectInterpretationException
-    {
-        return createTableIfNotExists(connection, tableName, dataType, DataObjectCache.getGlobal(), StandardDataObjectInterpreter.INSTANCE);
-    }
+    public boolean dropTableIfExists(Connection connection, String tableName)
+            throws SQLException;
 }

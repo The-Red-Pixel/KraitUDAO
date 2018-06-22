@@ -24,17 +24,14 @@ package com.theredpixelteam.kraitudao.common;
 import com.theredpixelteam.kraitudao.DataSource;
 import com.theredpixelteam.kraitudao.DataSourceException;
 import com.theredpixelteam.kraitudao.Transaction;
-import com.theredpixelteam.kraitudao.annotations.metadata.common.NotNull;
 import com.theredpixelteam.kraitudao.common.sql.*;
 import com.theredpixelteam.kraitudao.dataobject.*;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
-import com.theredpixelteam.kraitudao.interpreter.DataObjectMalformationException;
 import com.theredpixelteam.kraitudao.interpreter.StandardDataObjectInterpreter;
 import com.theredpixelteam.redtea.util.Pair;
 
 import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
 
@@ -169,35 +166,32 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     public void createTable(Connection conection, String tableName, Class<?> dataType)
             throws SQLException, DataObjectInterpretationException
     {
-        manipulator.createTable(conection, tableName, dataType, container, interpreter);
     }
 
     public void createTable(Connection connection,
                            DataObject dataObject)
             throws SQLException
     {
-        manipulator.createTable(connection, tableName, dataObject);
     }
 
     public void createTable(Connection connection,
                            Class<?> dataType)
             throws SQLException, DataObjectInterpretationException
     {
-        manipulator.createTable(connection, tableName, dataType, container, interpreter);
     }
 
     public boolean createTableIfNotExists(Connection connection,
                                       Class<?> dataType)
             throws SQLException, DataObjectInterpretationException
     {
-        return manipulator.createTableIfNotExists(connection, tableName, dataType, container, interpreter);
+        return false;
     }
 
     public boolean createTableIfNotExists(Connection connection,
                                       DataObject dataObject)
             throws SQLException
     {
-        return manipulator.createTableIfNotExists(connection, tableName, dataObject);
+        return false;
     }
 
     public DatabaseManipulator getManipulator()
