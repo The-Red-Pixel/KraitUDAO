@@ -79,6 +79,18 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
         return false;
     }
 
+    @Override
+    public ConstraintParser getConstraintParser()
+    {
+        return this.constraintParser;
+    }
+
+    @Override
+    public void setConstraintParser(ConstraintParser parser)
+    {
+        this.constraintParser = parser;
+    }
+
     protected static String arguments(int count)
     {
         count -= 1;
@@ -124,6 +136,8 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
 
         return stmt.toString();
     }
+
+    private ConstraintParser constraintParser;
 
     public static final DatabaseManipulator INSTANCE = new DefaultDatabaseManipulator();
 

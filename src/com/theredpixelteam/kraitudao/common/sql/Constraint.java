@@ -12,6 +12,61 @@ public class Constraint {
         this.expression = expression;
     }
 
+    public static Constraint ofNotNull()
+    {
+        return new Constraint(ConstraintType.NOT_NULL, null, null, null);
+    }
+
+    public static Constraint ofUnique()
+    {
+        return ofUnique(null);
+    }
+
+    public static Constraint ofUnique(String[] targets)
+    {
+        return new Constraint(ConstraintType.UNIQUE, targets, null, null);
+    }
+
+    public static Constraint ofPrimaryKey()
+    {
+        return ofPrimaryKey(null);
+    }
+
+    public static Constraint ofPrimaryKey(String[] targets)
+    {
+        return new Constraint(ConstraintType.PRIMARY_KEY, targets, null, null);
+    }
+
+    public static Constraint ofForeignKey(String target, String referencedTable, String referencedColumn)
+    {
+        return ofForeignKey(target, new Reference(referencedTable, referencedColumn));
+    }
+
+    public static Constraint ofForeignKey(String target, Reference reference)
+    {
+        return new Constraint(ConstraintType.FOREIGN_KEY, new String[] {target}, reference, null);
+    }
+
+    public static Constraint ofCheck(String expression)
+    {
+        return new Constraint(ConstraintType.CHECK, null, null, expression);
+    }
+
+    public static Constraint ofDefault(String expression)
+    {
+        return ofDefault(null, expression);
+    }
+
+    public static Constraint ofDefault(String target, String expression)
+    {
+        return new Constraint(ConstraintType.DEFAULT, target == null ? null : new String[] {target}, null, expression);
+    }
+
+    public static Constraint ofAutoIncrement()
+    {
+        return new Constraint(ConstraintType.AUTO_INCREMENT, null, null, null);
+    }
+
     public ConstraintType getConstraint()
     {
         return this.constraint;
@@ -46,6 +101,11 @@ public class Constraint {
         {
             this.referencedTable = referencedTable;
             this.referencedColumn = referencedColumn;
+        }
+
+        public static Reference of(String referencedTable, String referencedColumn)
+        {
+            return new Reference(referencedTable, referencedColumn);
         }
 
         public String getReferencedColumn()

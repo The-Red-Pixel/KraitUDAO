@@ -49,4 +49,8 @@ public interface DatabaseManipulator {
 
     public boolean dropTableIfExists(Connection connection, String tableName)
             throws SQLException;
+
+    public ConstraintParser getConstraintParser();
+
+    public void setConstraintParser(ConstraintParser parser);
 }
