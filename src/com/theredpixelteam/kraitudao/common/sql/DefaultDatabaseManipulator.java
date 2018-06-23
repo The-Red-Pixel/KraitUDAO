@@ -37,12 +37,23 @@ import java.util.*;
 public class DefaultDatabaseManipulator implements DatabaseManipulator {
     public DefaultDatabaseManipulator()
     {
-        this(DefaultConstraintParser.INSTANCE);
+        this(DefaultDataTypeParser.INSTANCE, DefaultConstraintParser.INSTANCE);
+    }
+
+    public DefaultDatabaseManipulator(DataTypeParser dataTypeParser)
+    {
+        this(dataTypeParser, DefaultConstraintParser.INSTANCE);
     }
 
     public DefaultDatabaseManipulator(ConstraintParser constraintParser)
     {
-        this.constraintParser = constraintParser;
+        this(DefaultDataTypeParser.INSTANCE, constraintParser);
+    }
+
+    public DefaultDatabaseManipulator(DataTypeParser dataTypeParser, ConstraintParser constraintParser)
+    {
+        setDataTypeParser(dataTypeParser);
+        setConstraintParser(constraintParser);
     }
 
     @Override
@@ -99,20 +110,20 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
     }
 
     @Override
-    public void createTable(Connection connection, String tableName, Vector3<String, Class<?>, Constraint>[] columns, Constraint[] tableConstraints)
+    public void createTable(Connection connection, String tableName, Vector3<String, DataType, Constraint>[] columns, Constraint[] tableConstraints)
             throws SQLException
     {
         createTable0(connection, tableName, columns, tableConstraints, false);
     }
 
     @Override
-    public boolean createTableIfNotExists(Connection connection, String tableName, Vector3<String, Class<?>, Constraint>[] columns, Constraint[] tableConstraints)
+    public boolean createTableIfNotExists(Connection connection, String tableName, Vector3<String, DataType, Constraint>[] columns, Constraint[] tableConstraints)
             throws SQLException
     {
         return createTable0(connection, tableName, columns, tableConstraints, true);
     }
 
-    private boolean createTable0(Connection connection, String tableName, Vector3<String, Class<?>, Constraint>[] columns, Constraint[] tableConstraints, boolean onNotExists)
+    private boolean createTable0(Connection connection, String tableName, Vector3<String, DataType, Constraint>[] columns, Constraint[] tableConstraints, boolean onNotExists)
             throws SQLException
     {
         PreparedStatement preparedStatement = connection.prepareStatement(
@@ -152,26 +163,34 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
         return n != 0;
     }
 
-    @Override
     public ConstraintParser getConstraintParser()
     {
         return this.constraintParser;
     }
 
-    @Override
     public void setConstraintParser(ConstraintParser parser)
     {
-        this.constraintParser = parser;
+        this.constraintParser = Objects.requireNonNull(parser);
     }
 
-    private String columns(Vector3<String, Class<?>, Constraint>[] columns)
+    public DataTypeParser getDataTypeParser()
+    {
+        return dataTypeParser;
+    }
+
+    public void setDataTypeParser(DataTypeParser parser)
+    {
+        this.dataTypeParser = Objects.requireNonNull(parser);
+    }
+
+    private String columns(Vector3<String, DataType, Constraint>[] columns)
     {
         StringBuilder statement = new StringBuilder();
 
-        for(Vector3<String, Class<?>, Constraint> column : columns)
+        for(Vector3<String, DataType, Constraint> column : columns)
             statement
                     .append(column.first()).append(" ")
-                    .append(fromType(column.second())).append(" ")
+                    .append(dataTypeParser.parseType(column.second())).append(" ")
                     .append(constraintParser.parse(column.third(), true))
                     .append(",");
 
@@ -196,16 +215,6 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
                 .append("CONSTRAINT CONSTRAINT_XXSYNTHETIC_").append(tableName).append("_").append(i).append(" ")
                 .append(constraintParser.parse(tableConstraint, false))
                 .append(",");
-    }
-
-    private String fromType(Class<?> type)
-    {
-        String sqlType = MAPPING.get(TypeUtil.tryToUnbox(type));
-
-        if(sqlType == null)
-            throw new DataObjectException("Unsupported type: " + type.getCanonicalName() + " (PLEASE try to use expandable value)");
-
-        return sqlType;
     }
 
     static void injectArguments(PreparedStatement preparedStatement, Pair<String, DataArgument>[] arguments)
@@ -263,23 +272,9 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
 
     private ConstraintParser constraintParser;
 
-    public static final DatabaseManipulator INSTANCE = new DefaultDatabaseManipulator();
+    private DataTypeParser dataTypeParser;
 
-    private static final Map<Class<?>, String> MAPPING = new HashMap<Class<?>, String>() {
-        {
-            //  Java type        |  SQL type
-            put(boolean.class,      "BOOLEAN");
-            put(byte.class,         "BINARY(1)");
-            put(char.class,         "NCHAR(1)");
-            put(short.class,        "SMALLINT");
-            put(int.class,          "INTEGER");
-            put(long.class,         "BIGINT");
-            put(float.class,        "FLOAT");
-            put(double.class,       "DOUBLE");
-            put(String.class,       "NVARCHAR");
-            put(BigDecimal.class,   "DECIMAL");
-        }
-    };
+    public static final DatabaseManipulator INSTANCE = new DefaultDatabaseManipulator();
 
     protected static class ResultSetFromDisposableStatement implements ResultSet {
         protected ResultSetFromDisposableStatement(ResultSet resultSet)
