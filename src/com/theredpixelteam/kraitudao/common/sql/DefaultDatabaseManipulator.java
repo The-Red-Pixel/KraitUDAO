@@ -21,6 +21,8 @@
 
 package com.theredpixelteam.kraitudao.common.sql;
 
+import com.theredpixelteam.kraitudao.dataobject.DataObjectException;
+import com.theredpixelteam.kraitudao.misc.TypeUtil;
 import com.theredpixelteam.redtea.util.Pair;
 import com.theredpixelteam.redtea.util.Vector3;
 
@@ -37,46 +39,107 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
     public ResultSet query(Connection connection, String tableName, Pair<String, DataArgument>[] keys, String[] values)
             throws SQLException
     {
-        return null;
+        PreparedStatement preparedStatement = connection.prepareStatement(
+                "SELECT " + combine(values, ",", "*") +
+                        " FROM " + tableName + " WHERE " + narrow(keys)
+        );
+
+        injectArguments(preparedStatement, keys);
+
+        return new ResultSetFromDisposableStatement(preparedStatement.executeQuery());
     }
 
     @Override
     public int delete(Connection connection, String tableName, Pair<String, DataArgument>[] keysAndValues)
             throws SQLException
     {
-        return 0;
+        PreparedStatement preparedStatement = connection.prepareStatement(
+                "DELETE FROM " + tableName +
+                        " WHERE " + narrow(keysAndValues)
+        );
+
+        injectArguments(preparedStatement, keysAndValues);
+
+        int n = preparedStatement.executeUpdate();
+
+        preparedStatement.close();
+
+        return n;
     }
 
     @Override
     public int insert(Connection connection, String tableName, Pair<String, DataArgument>[] values) throws SQLException
     {
-        return 0;
+        if(values == null || values.length == 0)
+            return 0;
+
+        PreparedStatement preparedStatement = connection.prepareStatement(
+                "MERGE INTO " + tableName +
+                        " KEY (" + combine(values, ",", null) + ")" +
+                        " VALUES (" + arguments(values.length) + ")"
+        );
+
+        injectArguments(preparedStatement, values);
+
+        int n = preparedStatement.executeUpdate();
+
+        preparedStatement.close();
+
+        return n;
     }
 
     @Override
     public void createTable(Connection connection, String tableName, Vector3<String, Class<?>, Constraint>[] columns, Constraint[] tableConstraints)
             throws SQLException
     {
-
+        createTable0(connection, tableName, columns, tableConstraints, false);
     }
 
     @Override
     public boolean createTableIfNotExists(Connection connection, String tableName, Vector3<String, Class<?>, Constraint>[] columns, Constraint[] tableConstraints)
             throws SQLException
     {
-        return false;
+        return createTable0(connection, tableName, columns, tableConstraints, true);
+    }
+
+    private boolean createTable0(Connection connection, String tableName, Vector3<String, Class<?>, Constraint>[] columns, Constraint[] tableConstraints, boolean onNotExists)
+            throws SQLException
+    {
+        PreparedStatement preparedStatement = connection.prepareStatement(
+                "CREATE TABLE " + (onNotExists ? "IF NOT EXISTS " : "") + tableName +
+                        " (" + columns(columns) + constraints(tableConstraints, tableName) + ")"
+        );
+
+        int n = preparedStatement.executeUpdate();
+
+        preparedStatement.close();
+
+        return n != 0;
     }
 
     @Override
     public void dropTable(Connection connection, String tableName) throws SQLException
     {
-
+        dropTable0(connection, tableName, false);
     }
 
     @Override
     public boolean dropTableIfExists(Connection connection, String tableName) throws SQLException
     {
-        return false;
+        return dropTable0(connection, tableName, true);
+    }
+
+    private boolean dropTable0(Connection connection, String tableName, boolean onExists) throws SQLException
+    {
+        PreparedStatement preparedStatement = connection.prepareStatement(
+                "DROP TABLE " + (onExists ? "IF EXISTS " : "") + tableName
+        );
+
+        int n = preparedStatement.executeUpdate();
+
+        preparedStatement.close();
+
+        return n != 0;
     }
 
     @Override
@@ -89,6 +152,57 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
     public void setConstraintParser(ConstraintParser parser)
     {
         this.constraintParser = parser;
+    }
+
+    private String columns(Vector3<String, Class<?>, Constraint>[] columns)
+    {
+        StringBuilder statement = new StringBuilder();
+
+        for(Vector3<String, Class<?>, Constraint> column : columns)
+            statement
+                    .append(column.first()).append(" ")
+                    .append(fromType(column.second())).append(" ")
+                    .append(constraintParser.parse(column.third(), true))
+                    .append(",");
+
+        return statement.toString();
+    }
+
+    private String constraints(Constraint[] tableConstraints, String tableName)
+    {
+        StringBuilder statement = new StringBuilder();
+
+        int p = tableConstraints.length - 1, i = 0;
+        while(i < p)
+            parseConstraint(statement, tableConstraints[i], tableName, i++);
+        parseConstraint(statement, tableConstraints[i], tableName, i);
+
+        return statement.toString();
+    }
+
+    private void parseConstraint(StringBuilder statement, Constraint tableConstraint, String tableName, int i)
+    {
+        statement
+                .append("CONSTRAINT CONSTRAINT_XXSYNTHETIC_").append(tableName).append("_").append(i).append(" ")
+                .append(constraintParser.parse(tableConstraint, false))
+                .append(",");
+    }
+
+    private String fromType(Class<?> type)
+    {
+        String sqlType = MAPPING.get(TypeUtil.tryToUnbox(type));
+
+        if(sqlType == null)
+            throw new DataObjectException("Unsupported type: " + type.getCanonicalName() + " (PLEASE try to use expandable value)");
+
+        return sqlType;
+    }
+
+    static void injectArguments(PreparedStatement preparedStatement, Pair<String, DataArgument>[] arguments)
+            throws SQLException
+    {
+        for(int i = 0; i < arguments.length;)
+            arguments[i].second().apply(preparedStatement, ++i);
     }
 
     protected static String arguments(int count)
