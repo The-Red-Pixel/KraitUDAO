@@ -35,6 +35,16 @@ import java.sql.Date;
 import java.util.*;
 
 public class DefaultDatabaseManipulator implements DatabaseManipulator {
+    public DefaultDatabaseManipulator()
+    {
+        this(DefaultConstraintParser.INSTANCE);
+    }
+
+    public DefaultDatabaseManipulator(ConstraintParser constraintParser)
+    {
+        this.constraintParser = constraintParser;
+    }
+
     @Override
     public ResultSet query(Connection connection, String tableName, Pair<String, DataArgument>[] keys, String[] values)
             throws SQLException
