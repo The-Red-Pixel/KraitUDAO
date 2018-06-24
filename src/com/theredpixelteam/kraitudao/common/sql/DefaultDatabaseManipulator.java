@@ -21,6 +21,7 @@
 
 package com.theredpixelteam.kraitudao.common.sql;
 
+import com.theredpixelteam.kraitudao.DataSourceError;
 import com.theredpixelteam.kraitudao.dataobject.DataObjectException;
 import com.theredpixelteam.kraitudao.misc.TypeUtil;
 import com.theredpixelteam.redtea.util.Pair;
@@ -110,20 +111,20 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
     }
 
     @Override
-    public void createTable(Connection connection, String tableName, Vector3<String, DataType, Constraint>[] columns, Constraint[] tableConstraints)
+    public void createTable(Connection connection, String tableName, Vector3<String, Class<?>, Constraint>[] columns, Constraint[] tableConstraints)
             throws SQLException
     {
         createTable0(connection, tableName, columns, tableConstraints, false);
     }
 
     @Override
-    public boolean createTableIfNotExists(Connection connection, String tableName, Vector3<String, DataType, Constraint>[] columns, Constraint[] tableConstraints)
+    public boolean createTableIfNotExists(Connection connection, String tableName, Vector3<String, Class<?>, Constraint>[] columns, Constraint[] tableConstraints)
             throws SQLException
     {
         return createTable0(connection, tableName, columns, tableConstraints, true);
     }
 
-    private boolean createTable0(Connection connection, String tableName, Vector3<String, DataType, Constraint>[] columns, Constraint[] tableConstraints, boolean onNotExists)
+    private boolean createTable0(Connection connection, String tableName, Vector3<String, Class<?>, Constraint>[] columns, Constraint[] tableConstraints, boolean onNotExists)
             throws SQLException
     {
         PreparedStatement preparedStatement = connection.prepareStatement(
@@ -183,11 +184,11 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
         this.dataTypeParser = Objects.requireNonNull(parser);
     }
 
-    private String columns(Vector3<String, DataType, Constraint>[] columns)
+    protected String columns(Vector3<String, Class<?>, Constraint>[] columns)
     {
         StringBuilder statement = new StringBuilder();
 
-        for(Vector3<String, DataType, Constraint> column : columns)
+        for(Vector3<String, Class<?>, Constraint> column : columns)
             statement
                     .append(column.first()).append(" ")
                     .append(dataTypeParser.parseType(column.second())).append(" ")
@@ -197,7 +198,7 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
         return statement.toString();
     }
 
-    private String constraints(Constraint[] tableConstraints, String tableName)
+    protected String constraints(Constraint[] tableConstraints, String tableName)
     {
         StringBuilder statement = new StringBuilder();
 
@@ -209,7 +210,7 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
         return statement.toString();
     }
 
-    private void parseConstraint(StringBuilder statement, Constraint tableConstraint, String tableName, int i)
+    protected void parseConstraint(StringBuilder statement, Constraint tableConstraint, String tableName, int i)
     {
         statement
                 .append("CONSTRAINT CONSTRAINT_XXSYNTHETIC_").append(tableName).append("_").append(i).append(" ")
@@ -217,7 +218,7 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
                 .append(",");
     }
 
-    static void injectArguments(PreparedStatement preparedStatement, Pair<String, DataArgument>[] arguments)
+    protected static void injectArguments(PreparedStatement preparedStatement, Pair<String, DataArgument>[] arguments)
             throws SQLException
     {
         for(int i = 0; i < arguments.length;)

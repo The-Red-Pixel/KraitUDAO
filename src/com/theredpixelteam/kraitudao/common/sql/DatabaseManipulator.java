@@ -27,6 +27,7 @@ import com.theredpixelteam.redtea.util.Vector3;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.SQLType;
 
 public interface DatabaseManipulator {
     public ResultSet query(Connection connection, String tableName, Pair<String, DataArgument>[] keys, String[] values)
@@ -38,10 +39,10 @@ public interface DatabaseManipulator {
     public int insert(Connection connection, String tableName, Pair<String, DataArgument>[] values)
             throws SQLException;
 
-    public void createTable(Connection connection, String tableName, Vector3<String, DataType, Constraint>[] columns, Constraint[] tableConstraints)
+    public void createTable(Connection connection, String tableName, Vector3<String, Class<?>, Constraint>[] columns, Constraint[] tableConstraints)
             throws SQLException;
 
-    public boolean createTableIfNotExists(Connection connection, String tableName, Vector3<String, DataType, Constraint>[] columns, Constraint[] tableConstraints)
+    public boolean createTableIfNotExists(Connection connection, String tableName, Vector3<String, Class<?>, Constraint>[] columns, Constraint[] tableConstraints)
             throws SQLException;
 
     public void dropTable(Connection connection, String tableName)

@@ -58,7 +58,7 @@ public class DefaultDataArgumentWrapper implements DataArgumentWrapper {
     protected static final Map<Class<?>, DataArgumentApplier> MAPPED = new HashMap<Class<?>, DataArgumentApplier>() {
         {
             put(boolean.class,      (p, i, v) -> p.setBoolean(i, (Boolean) v));
-            put(byte.class,         (p, i, v) -> p.setBytes(i, new byte[] {(Byte) v}));
+            put(byte.class,         (p, i, v) -> p.setByte(i, (Byte) v));
             put(char.class,         (p, i, v) -> p.setNCharacterStream(i, new SingletonReader((Character) v), 1));
             put(short.class,        (p, i, v) -> p.setShort(i, (Short) v));
             put(int.class,          (p, i, v) -> p.setInt(i, (Integer) v));

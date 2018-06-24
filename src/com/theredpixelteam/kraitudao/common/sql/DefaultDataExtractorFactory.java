@@ -58,20 +58,6 @@ public class DefaultDataExtractorFactory implements DataExtractorFactory {
         return Optional.of(resultSet -> directableDataExtractor.extract(resultSet, null, columnIndex, true));
     }
 
-    private static byte readSilently(InputStream inputStream)
-    {
-        try {
-            int i = inputStream.read();
-
-            if(i < 0)
-                throw new EOFException();
-
-            return (byte) i;
-        } catch (IOException e) {
-            throw new DataSourceError(e);
-        }
-    }
-
     private static char readSilently(Reader reader)
     {
         try {
@@ -92,7 +78,7 @@ public class DefaultDataExtractorFactory implements DataExtractorFactory {
     {
         {
             put(boolean.class,      (r, n, i, u) -> u ? r.getBoolean(i) : r.getBoolean(n));
-            put(byte.class,         (r, n, i, u) -> (u ? r.getBytes(i) : r.getBytes(n))[0]);
+            put(byte.class,         (r, n, i, u) -> u ? r.getByte(i) : r.getByte(n));
             put(char.class,         (r, n, i, u) -> readSilently(u ? r.getNCharacterStream(i) : r.getNCharacterStream(n)));
             put(short.class,        (r, n, i, u) -> u ? r.getShort(i) : r.getShort(n));
             put(int.class,          (r, n, i, u) -> u ? r.getInt(i) : r.getInt(n));
