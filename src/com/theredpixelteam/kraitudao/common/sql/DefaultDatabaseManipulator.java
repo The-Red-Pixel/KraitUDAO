@@ -21,9 +21,6 @@
 
 package com.theredpixelteam.kraitudao.common.sql;
 
-import com.theredpixelteam.kraitudao.DataSourceError;
-import com.theredpixelteam.kraitudao.dataobject.DataObjectException;
-import com.theredpixelteam.kraitudao.misc.TypeUtil;
 import com.theredpixelteam.redtea.util.Pair;
 import com.theredpixelteam.redtea.util.Vector3;
 
@@ -97,7 +94,7 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
 
         PreparedStatement preparedStatement = connection.prepareStatement(
                 "MERGE INTO " + tableName +
-                        " KEY (" + combine(values, ",", null) + ")" +
+                        " (" + combine(values, ",", null) + ")" +
                         " VALUES (" + arguments(values.length) + ")"
         );
 
