@@ -50,4 +50,6 @@ public interface DatabaseManipulator {
 
     public boolean dropTableIfExists(Connection connection, String tableName)
             throws SQLException;
+
+    public boolean supportType(Class<?> type);
 }

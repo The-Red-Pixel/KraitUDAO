@@ -19,6 +19,12 @@ public class DefaultDataTypeParser implements DataTypeParser {
         return type;
     }
 
+    @Override
+    public boolean supportType(Class<?> dataType)
+    {
+        return MAPPING.containsKey(TypeUtil.tryToUnbox(dataType));
+    }
+
     private static final Map<Class<?>, String> MAPPING = new HashMap<Class<?>, String>() {
         {
             put(boolean.class,      "BIT");

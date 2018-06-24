@@ -151,6 +151,12 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
         return dropTable0(connection, tableName, true);
     }
 
+    @Override
+    public boolean supportType(Class<?> type)
+    {
+        return dataTypeParser.supportType(type);
+    }
+
     private boolean dropTable0(Connection connection, String tableName, boolean onExists) throws SQLException
     {
         PreparedStatement preparedStatement = connection.prepareStatement(
