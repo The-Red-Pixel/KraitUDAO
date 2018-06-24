@@ -21,10 +21,10 @@
 
 package com.theredpixelteam.kraitudao.interpreter;
 
-import com.theredpixelteam.kraitudao.dataobject.DataObject;
-import com.theredpixelteam.kraitudao.dataobject.ElementDataObject;
-import com.theredpixelteam.kraitudao.dataobject.MultipleDataObject;
-import com.theredpixelteam.kraitudao.dataobject.UniqueDataObject;
+import com.theredpixelteam.kraitudao.dataobject.*;
+
+import java.util.Map;
+import java.util.Optional;
 
 public interface DataObjectInterpreter {
     public default DataObject get(Object object) throws DataObjectInterpretationException
@@ -54,6 +54,8 @@ public interface DataObjectInterpreter {
     public UniqueDataObject getUnique(Class<?> type) throws DataObjectInterpretationException;
 
     public ElementDataObject getElement(Class<?> type) throws DataObjectInterpretationException;
+
+    public Optional<Map<String, ValueObject>> expand(ValueObject valueObject) throws DataObjectInterpretationException;
 
     public DataObject expand(DataObject dataObject) throws DataObjectInterpretationException;
 }

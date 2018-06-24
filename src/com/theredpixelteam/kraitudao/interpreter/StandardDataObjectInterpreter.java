@@ -118,6 +118,39 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
     }
 
     @Override
+    public Optional<Map<String, ValueObject>> expand(ValueObject valueObject) throws DataObjectInterpretationException
+    {
+        ExpandRule expandRule = valueObject.getExpandRule().orElse(null);
+
+        if(expandRule == null)
+            return Optional.empty();
+
+        DataObject dataObject = valueObject.getOwner();
+
+        Map<String, ValueObject> map = new HashMap<>();
+        for(ExpandRule.Entry entry : expandRule.getEntries())
+        {
+            Class<?> type = entry.getExpandedType();
+            String name = entry.name();
+
+            ValueObjectContainer valueObjectContainer = new ValueObjectContainer(dataObject.getType(), type, REFLECTION_COMPATIBLE_TYPES.get(type));
+            valueObjectContainer.name = name;
+            valueObjectContainer.primaryKey = valueObject.isPrimaryKey();
+            valueObjectContainer.secondaryKey = valueObject.isSecondaryKey();
+            valueObjectContainer.owner = valueObject.getOwner();
+            valueObjectContainer.metadata = entry.getMetadataMap();
+
+            expand(dataObject, valueObject, valueObjectContainer, entry);
+
+            valueObjectContainer.seal();
+
+            map.put(valueObjectContainer.getName(), valueObjectContainer);
+        }
+
+        return Optional.of(map);
+    }
+
+    @Override
     public DataObject expand(DataObject dataObject) throws DataObjectInterpretationException
     {
         DataObjectContainer dataObjectContainer;
@@ -130,30 +163,14 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             dataObjectContainer.putKey(KeyType.PRIMARY, multipleDataObject.getPrimaryKey());
 
             for(ValueObject secondaryKey : multipleDataObject.getSecondaryKeys().values())
-                if(!secondaryKey.getExpandRule().isPresent())
+            {
+                Optional<Map<String, ValueObject>> map = expand(secondaryKey);
+
+                if(!map.isPresent())
                     dataObjectContainer.putKey(KeyType.SECONDARY, secondaryKey);
-                else
-                {
-                    ExpandRule expandRule = secondaryKey.getExpandRule().get();
-
-                    for(ExpandRule.Entry entry : expandRule.getEntries())
-                    {
-                        Class<?> type = entry.getExpandedType();
-                        String name = entry.name();
-
-                        ValueObjectContainer valueObjectContainer = new ValueObjectContainer(dataObject.getType(), type, REFLECTION_COMPATIBLE_TYPES.get(type));
-                        valueObjectContainer.name = name;
-                        valueObjectContainer.secondaryKey = true;
-                        valueObjectContainer.owner = dataObject;
-                        valueObjectContainer.metadata = entry.getMetadataMap();
-
-                        expand(dataObject, secondaryKey, valueObjectContainer, entry);
-
-                        valueObjectContainer.seal();
-
-                        dataObjectContainer.putKey(KeyType.SECONDARY, valueObjectContainer);
-                    }
-                }
+                else for(ValueObject expandedSecondaryKey : map.get().values())
+                    dataObjectContainer.putKey(KeyType.SECONDARY, expandedSecondaryKey);
+            }
         }
         else if(dataObject instanceof UniqueDataObject)
         {
@@ -166,37 +183,22 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             throw new DataObjectMalformationException.IllegalType();
 
         for(ValueObject value : dataObject.getValues().values())
-            if(!value.getExpandRule().isPresent())
+        {
+            Optional<Map<String, ValueObject>> map = expand(value);
+
+            if (!map.isPresent())
                 dataObjectContainer.putValue(value);
-            else
-            {
-                ExpandRule expandRule = value.getExpandRule().get();
-
-                for(ExpandRule.Entry entry : expandRule.getEntries())
-                {
-                    Class<?> type = entry.getExpandedType();
-                    String name = entry.name();
-
-                    ValueObjectContainer valueObjectContainer = new ValueObjectContainer(dataObject.getType(), type, REFLECTION_COMPATIBLE_TYPES.get(type));
-                    valueObjectContainer.name = name;
-                    valueObjectContainer.owner = dataObject;
-                    valueObjectContainer.metadata = entry.getMetadataMap();
-
-                    expand(dataObject, value, valueObjectContainer, entry);
-
-                    valueObjectContainer.seal();
-
-                    dataObjectContainer.putValue(valueObjectContainer);
-                }
-            }
+            else for(ValueObject expandedValueObject : map.get().values())
+                dataObjectContainer.putValue(expandedValueObject);
+        }
 
         return dataObjectContainer;
     }
 
     private static void expand(DataObject dataObject,
-                                         ValueObject origin,
-                                         ValueObjectContainer valueObjectContainer,
-                                         ExpandRule.Entry entry)
+                               ValueObject origin,
+                               ValueObjectContainer valueObjectContainer,
+                               ExpandRule.Entry entry)
             throws DataObjectInterpretationException
     {
         Method m0, m1;
