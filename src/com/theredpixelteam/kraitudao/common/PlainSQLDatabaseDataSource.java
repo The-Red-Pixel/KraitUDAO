@@ -29,6 +29,9 @@ import com.theredpixelteam.kraitudao.dataobject.*;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
 import com.theredpixelteam.kraitudao.interpreter.StandardDataObjectInterpreter;
+import com.theredpixelteam.redtea.function.FunctionWithThrowable;
+import com.theredpixelteam.redtea.function.ProcedureWithThrowable;
+import com.theredpixelteam.redtea.function.SupplierWithThrowable;
 import com.theredpixelteam.redtea.util.Pair;
 
 import java.sql.Connection;
@@ -112,34 +115,34 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     }
 
     @Override
-    public <T> boolean pull(T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException
+    public <T> boolean pull(T object, Class<T> type) throws DataSourceException
     {
         return false;
     }
 
     @Override
-    public <T> Collection<T> pull(Class<T> type) throws DataSourceException, DataObjectInterpretationException
+    public <T> Collection<T> pull(Class<T> type) throws DataSourceException
     {
         return null;
     }
 
     @Override
     public <T> Collection<T> pullVaguely(T object, Class<T> type)
-            throws DataSourceException, DataObjectInterpretationException
+            throws DataSourceException
     {
         return null;
     }
 
     @Override
     public <T> Transaction commit(Transaction transaction, T object, Class<T> type)
-            throws DataSourceException, DataObjectInterpretationException
+            throws DataSourceException
     {
         return null;
     }
 
     @Override
     public <T> Transaction remove(Transaction transaction, T object, Class<T> type)
-            throws DataSourceException, DataObjectInterpretationException
+            throws DataSourceException
     {
         return null;
     }
@@ -152,7 +155,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
     @Override
     public <T> Transaction removeVaguely(Transaction transaction, T object, Class<T> type)
-            throws DataSourceException, DataObjectInterpretationException
+            throws DataSourceException
     {
         return null;
     }
@@ -163,35 +166,37 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         while(this.currentTransaction != null);
     }
 
-    public void createTable(Connection conection, String tableName, Class<?> dataType)
-            throws SQLException, DataObjectInterpretationException
+    public void createTable(Connection conection, Class<?> dataType) throws DataSourceException
     {
+        try {
+            createTable0(connection, container.interpretIfAbsent(dataType, interpreter), false);
+        } catch (DataObjectInterpretationException e) {
+            throw new DataSourceException(e);
+        }
     }
 
-    public void createTable(Connection connection,
-                           DataObject dataObject)
-            throws SQLException
+    public void createTable(Connection connection, DataObject dataObject) throws DataSourceException
     {
+        createTable0(connection, dataObject, false);
     }
 
-    public void createTable(Connection connection,
-                           Class<?> dataType)
-            throws SQLException, DataObjectInterpretationException
+    public boolean createTableIfNotExists(Connection connection, Class<?> dataType) throws DataSourceException
     {
+        try {
+            return createTable0(connection, container.interpretIfAbsent(dataType, interpreter), true);
+        } catch (DataObjectInterpretationException e) {
+            throw new DataSourceException(e);
+        }
     }
 
-    public boolean createTableIfNotExists(Connection connection,
-                                      Class<?> dataType)
-            throws SQLException, DataObjectInterpretationException
+    public boolean createTableIfNotExists(Connection connection, DataObject dataObject) throws DataSourceException
     {
-        return false;
+        return createTable0(connection, dataObject, true);
     }
 
-    public boolean createTableIfNotExists(Connection connection,
-                                      DataObject dataObject)
-            throws SQLException
+    private boolean createTable0(Connection connection, DataObject dataObject, boolean ifNotExists) throws DataSourceException
     {
-        return false;
+
     }
 
     public DatabaseManipulator getManipulator()
@@ -239,6 +244,50 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     protected DataArgumentWrapper argumentWrapper;
 
     protected DataExtractorFactory extractorFactory;
+
+    private class Node
+    {
+        Node(ProcedureWithThrowable<SQLException> procedure)
+        {
+            this(procedure, new HashMap<>());
+        }
+
+        Node(ProcedureWithThrowable<SQLException> procedure, Map<Class<?>, FunctionWithThrowable<String, String, SQLException>> cache)
+        {
+            this.procedure = procedure;
+            this.children = new ArrayList<>();
+            this.cache = cache;
+        }
+
+        void run() throws SQLException
+        {
+            procedure.run();
+
+            for(Node node : children)
+                node.run();
+        }
+
+        void append(ProcedureWithThrowable<SQLException> procedure)
+        {
+            children.add(new Node(procedure, cache));
+        }
+
+        Optional<SupplierWithThrowable<String, SQLException>> getCache(Class<?> type, String tableName)
+        {
+            FunctionWithThrowable<String, String, SQLException> cached;
+
+            if((cached = cache.get(type)) == null)
+                return Optional.empty();
+
+            return Optional.of(() -> cached.apply(tableName));
+        }
+
+        final Map<Class<?>, FunctionWithThrowable<String, String, SQLException>> cache;
+
+        final ProcedureWithThrowable<SQLException> procedure;
+
+        final ArrayList<Node> children;
+    }
 
     private class TransactionImpl implements Transaction
     {

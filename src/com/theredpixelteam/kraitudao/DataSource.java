@@ -27,92 +27,92 @@ import java.util.Collection;
 
 @SuppressWarnings("unchecked")
 public interface DataSource {
-    public default <T> void pull(T object) throws DataSourceException, DataObjectInterpretationException
+    public default <T> void pull(T object) throws DataSourceException
     {
         pull(object, (Class<T>) object.getClass());
     }
 
-    public <T> boolean pull(T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException;
+    public <T> boolean pull(T object, Class<T> type) throws DataSourceException;
 
-    public <T> Collection<T> pull(Class<T> type) throws DataSourceException, DataObjectInterpretationException;
+    public <T> Collection<T> pull(Class<T> type) throws DataSourceException;
 
-    public default <T> Collection<T> pullVaguely(T object) throws DataSourceException, DataObjectInterpretationException
+    public default <T> Collection<T> pullVaguely(T object) throws DataSourceException
     {
         return pullVaguely(object, (Class<T>)object.getClass());
     }
 
-    public <T> Collection<T> pullVaguely(T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException;
+    public <T> Collection<T> pullVaguely(T object, Class<T> type) throws DataSourceException;
 
-    public default <T> Transaction commit(T object) throws DataSourceException, DataObjectInterpretationException
+    public default <T> Transaction commit(T object) throws DataSourceException
     {
         return commit(null, object);
     }
 
-    public default <T> void commitInstantly(T object) throws DataSourceException, DataObjectInterpretationException
+    public default <T> void commitInstantly(T object) throws DataSourceException
     {
         commit(object).push();
     }
 
-    public default <T> Transaction commit(Transaction transaction, T object) throws DataSourceException, DataObjectInterpretationException
+    public default <T> Transaction commit(Transaction transaction, T object) throws DataSourceException
     {
         return commit(transaction, object, (Class<T>)object.getClass());
     }
 
-    public default <T> void commitInstantly(Transaction transaction, T object) throws DataSourceException, DataObjectInterpretationException
+    public default <T> void commitInstantly(Transaction transaction, T object) throws DataSourceException
     {
         commit(transaction, object).push();
     }
 
-    public default <T> Transaction commit(T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException
+    public default <T> Transaction commit(T object, Class<T> type) throws DataSourceException
     {
         return commit(null, object, type);
     }
 
-    public default <T> void commitInstantly(T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException
+    public default <T> void commitInstantly(T object, Class<T> type) throws DataSourceException
     {
         commit(object, type).push();
     }
 
-    public <T> Transaction commit(Transaction transaction, T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException;
+    public <T> Transaction commit(Transaction transaction, T object, Class<T> type) throws DataSourceException;
 
-    public default <T> void commitInstantly(Transaction transaction, T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException
+    public default <T> void commitInstantly(Transaction transaction, T object, Class<T> type) throws DataSourceException
     {
         commit(transaction, object, type).push();
     }
 
-    public default <T> Transaction remove(T object) throws DataSourceException, DataObjectInterpretationException
+    public default <T> Transaction remove(T object) throws DataSourceException
     {
         return remove(null, object);
     }
 
-    public default <T> void removeInstantly(T object) throws DataSourceException, DataObjectInterpretationException
+    public default <T> void removeInstantly(T object) throws DataSourceException
     {
         remove(object).push();
     }
 
-    public default <T> Transaction remove(T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException
+    public default <T> Transaction remove(T object, Class<T> type) throws DataSourceException
     {
         return remove(null, object, type);
     }
 
-    public default <T> void removeInstantly(T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException
+    public default <T> void removeInstantly(T object, Class<T> type) throws DataSourceException
     {
         remove(object, type).push();
     }
 
-    public default <T> Transaction remove(Transaction transaction, T object) throws DataSourceException, DataObjectInterpretationException
+    public default <T> Transaction remove(Transaction transaction, T object) throws DataSourceException
     {
         return remove(transaction, object, (Class<T>)object.getClass());
     }
 
-    public default <T> void removeInstantly(Transaction transaction, T object) throws DataSourceException, DataObjectInterpretationException
+    public default <T> void removeInstantly(Transaction transaction, T object) throws DataSourceException
     {
         remove(transaction, object).push();
     }
 
-    public <T> Transaction remove(Transaction transaction, T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException;
+    public <T> Transaction remove(Transaction transaction, T object, Class<T> type) throws DataSourceException;
 
-    public default <T> void removeInstantly(Transaction transaction, T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException
+    public default <T> void removeInstantly(Transaction transaction, T object, Class<T> type) throws DataSourceException
     {
         remove(transaction, object, type).push();
     }
@@ -134,22 +134,22 @@ public interface DataSource {
         clear(transaction).push();
     }
 
-    public default <T> Transaction removeVaguely(T object) throws DataSourceException, DataObjectInterpretationException
+    public default <T> Transaction removeVaguely(T object) throws DataSourceException
     {
         return removeVaguely(null, object);
     }
 
-    public default<T> Transaction removeVaguely(T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException
+    public default<T> Transaction removeVaguely(T object, Class<T> type) throws DataSourceException
     {
         return removeVaguely(null, object, type);
     }
 
-    public default <T> Transaction removeVaguely(Transaction transaction, T object) throws DataSourceException, DataObjectInterpretationException
+    public default <T> Transaction removeVaguely(Transaction transaction, T object) throws DataSourceException
     {
         return removeVaguely(transaction, object, (Class<T>)object.getClass());
     }
 
-    public <T> Transaction removeVaguely(Transaction transaction, T object, Class<T> type) throws DataSourceException, DataObjectInterpretationException;
+    public <T> Transaction removeVaguely(Transaction transaction, T object, Class<T> type) throws DataSourceException;
 
     public void waitForTransaction();
 }
