@@ -24,14 +24,18 @@ package com.theredpixelteam.kraitudao.common;
 import com.theredpixelteam.kraitudao.DataSource;
 import com.theredpixelteam.kraitudao.DataSourceException;
 import com.theredpixelteam.kraitudao.Transaction;
+import com.theredpixelteam.kraitudao.annotations.metadata.common.ExpandForcibly;
+import com.theredpixelteam.kraitudao.annotations.metadata.common.NotNull;
 import com.theredpixelteam.kraitudao.common.sql.*;
 import com.theredpixelteam.kraitudao.dataobject.*;
+import com.theredpixelteam.kraitudao.dataobject.util.ValueObjectIterator;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectExpander;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
 import com.theredpixelteam.kraitudao.interpreter.common.StandardDataObjectExpander;
 import com.theredpixelteam.kraitudao.interpreter.common.StandardDataObjectInterpreter;
 import com.theredpixelteam.redtea.util.Pair;
+import com.theredpixelteam.redtea.util.Vector3;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -198,9 +202,62 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         return createTable0(connection, dataObject, true);
     }
 
+    @SuppressWarnings("unchecked")
     private boolean createTable0(Connection connection, DataObject dataObject, boolean ifNotExists) throws DataSourceException
     {
-        return false;
+        try {
+            List<Constraint> tableConstraints = new ArrayList<>();
+            List<Vector3<String, Class<?>, Constraint[]>> columns = new ArrayList<>();
+
+            List<ValueObject> keys = new ArrayList<>();
+
+            List<ValueObject> valueObjects = new ArrayList<>();
+            for (ValueObject valueObject : new ValueObjectIterator(dataObject))
+            {
+                Class<?> columnType = tryRemapping(valueObject.getType());
+
+                if (valueObject.hasMetadata(ExpandForcibly.class) || !manipulator.supportType(columnType))
+                    valueObjects.addAll(container.expand(valueObject, expander)
+                            .orElseThrow(() -> new DataSourceException.UnsupportedValueType(columnType.getCanonicalName())).values());
+                else
+                    valueObjects.add(valueObject);
+
+                for (ValueObject confirmed : valueObjects)
+                {
+                    if(confirmed.isKey())
+                        keys.add(confirmed);
+
+                    columns.add(Vector3.of(
+                            confirmed.getName(),
+                            tryRemapping(confirmed.getType()),
+                            confirmed.hasMetadata(NotNull.class) ? new Constraint[]{Constraint.ofNotNull()} : new Constraint[0]));
+                }
+
+                valueObjects.clear();
+            }
+
+            if(!keys.isEmpty())
+            {
+                String[] keyNames = new String[keys.size()];
+
+                for(int i = 0; i < keyNames.length; i++)
+                    keyNames[i] = keys.get(i).getName();
+
+                tableConstraints.add(Constraint.ofPrimaryKey(keyNames));
+            }
+
+            Constraint[] tableConstraintArray = tableConstraints.toArray(new Constraint[tableConstraints.size()]);
+            Vector3<String, Class<?>, Constraint[]>[] columnArray = columns.toArray(new Vector3[columns.size()]);
+
+            if(ifNotExists)
+                return manipulator.createTableIfNotExists(connection, tableName, columnArray, tableConstraintArray);
+            else
+                manipulator.createTable(connection, tableName, columnArray, tableConstraintArray);
+        } catch (DataObjectInterpretationException | SQLException e) {
+            throw new DataSourceException(e);
+        }
+
+        return true;
     }
 
     public DatabaseManipulator getManipulator()
@@ -233,6 +290,13 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         return extractorFactory;
     }
 
+    private static Class<?> tryRemapping(Class<?> type)
+    {
+        Class<?> remapped = REMAPPED.get(type);
+
+        return remapped == null ? type : remapped;
+    }
+
     private volatile Transaction currentTransaction;
 
     protected String tableName;
@@ -250,6 +314,14 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     protected DataArgumentWrapper argumentWrapper;
 
     protected DataExtractorFactory extractorFactory;
+
+    private static final Map<Class<?>, Class<?>> REMAPPED = new HashMap<Class<?>, Class<?>>() {
+        {
+            put(Map.class, String.class);
+            put(List.class, String.class);
+            put(Set.class, String.class);
+        }
+    };
 
     private class TransactionImpl implements Transaction
     {

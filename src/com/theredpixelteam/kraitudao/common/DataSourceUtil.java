@@ -48,63 +48,63 @@ public final class DataSourceUtil {
 
         @Override
         public synchronized <T> boolean pull(T object, Class<T> type)
-                throws DataSourceException, DataObjectInterpretationException
+                throws DataSourceException
         {
             return this.object.pull(object, type);
         }
 
         @Override
         public synchronized <T> Collection<T> pull(Class<T> type)
-                throws DataSourceException, DataObjectInterpretationException
+                throws DataSourceException
         {
             return this.object.pull(type);
         }
 
         @Override
         public synchronized <T> Collection<T> pullVaguely(T object)
-                throws DataSourceException, DataObjectInterpretationException
+                throws DataSourceException
         {
             return this.object.pullVaguely(object);
         }
 
         @Override
         public <T> Collection<T> pullVaguely(T object, Class<T> type)
-                throws DataSourceException, DataObjectInterpretationException
+                throws DataSourceException
         {
             return this.object.pullVaguely(object, type);
         }
 
         @Override
         public synchronized <T> Transaction commit(T object, Class<T> type)
-                throws DataSourceException, DataObjectInterpretationException
+                throws DataSourceException
         {
             return new SynchronizedTransaction(this.object.commit(object, type));
         }
 
         @Override
         public synchronized <T> Transaction commit(Transaction transition, T object, Class<T> type)
-                throws DataSourceException, DataObjectInterpretationException
+                throws DataSourceException
         {
             return this.object.commit(transition, object, type);
         }
 
         @Override
         public synchronized <T> Transaction remove(T object)
-                throws DataSourceException, DataObjectInterpretationException
+                throws DataSourceException
         {
             return new SynchronizedTransaction(this.object.remove(object));
         }
 
         @Override
         public synchronized <T> Transaction remove(Transaction transition, T object)
-                throws DataSourceException, DataObjectInterpretationException
+                throws DataSourceException
         {
             return this.object.remove(transition, object);
         }
 
         @Override
         public <T> Transaction remove(Transaction transaction, T object, Class<T> type)
-                throws DataSourceException, DataObjectInterpretationException
+                throws DataSourceException
         {
             return this.object.remove(transaction, object, type);
         }
@@ -123,21 +123,21 @@ public final class DataSourceUtil {
 
         @Override
         public synchronized <T> Transaction removeVaguely(T object)
-                throws DataSourceException, DataObjectInterpretationException
+                throws DataSourceException
         {
             return new SynchronizedTransaction(this.object.removeVaguely(object));
         }
 
         @Override
         public synchronized <T> Transaction removeVaguely(Transaction transition, T object)
-                throws DataSourceException, DataObjectInterpretationException
+                throws DataSourceException
         {
             return this.object.removeVaguely(transition, object);
         }
 
         @Override
         public <T> Transaction removeVaguely(Transaction transaction, T object, Class<T> type)
-                throws DataSourceException, DataObjectInterpretationException
+                throws DataSourceException
         {
             return this.object.removeVaguely(transaction, object, type);
         }

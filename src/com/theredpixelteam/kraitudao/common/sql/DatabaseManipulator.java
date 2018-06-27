@@ -39,10 +39,10 @@ public interface DatabaseManipulator {
     public int insert(Connection connection, String tableName, Pair<String, DataArgument>[] values)
             throws SQLException;
 
-    public void createTable(Connection connection, String tableName, Vector3<String, Class<?>, Constraint>[] columns, Constraint[] tableConstraints)
+    public void createTable(Connection connection, String tableName, Vector3<String, Class<?>, Constraint[]>[] columns, Constraint[] tableConstraints)
             throws SQLException;
 
-    public boolean createTableIfNotExists(Connection connection, String tableName, Vector3<String, Class<?>, Constraint>[] columns, Constraint[] tableConstraints)
+    public boolean createTableIfNotExists(Connection connection, String tableName, Vector3<String, Class<?>, Constraint[]>[] columns, Constraint[] tableConstraints)
             throws SQLException;
 
     public void dropTable(Connection connection, String tableName)

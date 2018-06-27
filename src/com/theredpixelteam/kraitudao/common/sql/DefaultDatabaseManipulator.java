@@ -108,25 +108,28 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
     }
 
     @Override
-    public void createTable(Connection connection, String tableName, Vector3<String, Class<?>, Constraint>[] columns, Constraint[] tableConstraints)
+    public void createTable(Connection connection, String tableName, Vector3<String, Class<?>, Constraint[]>[] columns, Constraint[] tableConstraints)
             throws SQLException
     {
         createTable0(connection, tableName, columns, tableConstraints, false);
     }
 
     @Override
-    public boolean createTableIfNotExists(Connection connection, String tableName, Vector3<String, Class<?>, Constraint>[] columns, Constraint[] tableConstraints)
+    public boolean createTableIfNotExists(Connection connection, String tableName, Vector3<String, Class<?>, Constraint[]>[] columns, Constraint[] tableConstraints)
             throws SQLException
     {
         return createTable0(connection, tableName, columns, tableConstraints, true);
     }
 
-    private boolean createTable0(Connection connection, String tableName, Vector3<String, Class<?>, Constraint>[] columns, Constraint[] tableConstraints, boolean onNotExists)
+    private boolean createTable0(Connection connection, String tableName, Vector3<String, Class<?>, Constraint[]>[] columns, Constraint[] tableConstraints, boolean onNotExists)
             throws SQLException
     {
+        if(columns.length == 0)
+            throw new SQLException("Creating a table with no columns");
+
         PreparedStatement preparedStatement = connection.prepareStatement(
                 "CREATE TABLE " + (onNotExists ? "IF NOT EXISTS " : "") + tableName +
-                        " (" + columns(columns) + constraints(tableConstraints, tableName) + ")"
+                        " (" + columnsNConstraints(columns, tableConstraints, tableName) + ")"
         );
 
         int n = preparedStatement.executeUpdate();
@@ -187,16 +190,37 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
         this.dataTypeParser = Objects.requireNonNull(parser);
     }
 
-    protected String columns(Vector3<String, Class<?>, Constraint>[] columns)
+    protected String columnsNConstraints(Vector3<String, Class<?>, Constraint[]>[] columns, Constraint[] tableConstraints, String tableName)
     {
         StringBuilder statement = new StringBuilder();
 
-        for(Vector3<String, Class<?>, Constraint> column : columns)
+        statement.append(columns(columns));
+
+        if(tableConstraints.length > 0)
+            statement.append(",").append(constraints(tableConstraints, tableName));
+
+        return statement.toString();
+    }
+
+    protected String columns(Vector3<String, Class<?>, Constraint[]>[] columns)
+    {
+        StringBuilder statement = new StringBuilder();
+
+        int i = 0;
+        while (true)
+        {
             statement
-                    .append(column.first()).append(" ")
-                    .append(dataTypeParser.parseType(column.second())).append(" ")
-                    .append(constraintParser.parse(column.third(), true))
-                    .append(",");
+                    .append(columns[i].first()).append(" ")
+                    .append(dataTypeParser.parseType(columns[i].second())).append(" ");
+
+            for (Constraint constraint : columns[i].third())
+                statement.append(constraintParser.parse(constraint, true)).append(" ");
+
+            if (++i < columns.length)
+                statement.append(",");
+            else
+                break;
+        }
 
         return statement.toString();
     }
