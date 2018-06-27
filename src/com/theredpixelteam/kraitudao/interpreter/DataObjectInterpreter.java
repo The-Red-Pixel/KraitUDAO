@@ -23,9 +23,6 @@ package com.theredpixelteam.kraitudao.interpreter;
 
 import com.theredpixelteam.kraitudao.dataobject.*;
 
-import java.util.Map;
-import java.util.Optional;
-
 public interface DataObjectInterpreter {
     public default DataObject get(Object object) throws DataObjectInterpretationException
     {
@@ -55,7 +52,5 @@ public interface DataObjectInterpreter {
 
     public ElementDataObject getElement(Class<?> type) throws DataObjectInterpretationException;
 
-    public Optional<Map<String, ValueObject>> expand(ValueObject valueObject) throws DataObjectInterpretationException;
 
-    public DataObject expand(DataObject dataObject) throws DataObjectInterpretationException;
 }

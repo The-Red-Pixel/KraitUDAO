@@ -19,7 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-package com.theredpixelteam.kraitudao.interpreter;
+package com.theredpixelteam.kraitudao.interpreter.common;
 
 import com.theredpixelteam.kraitudao.PlaceHolder;
 import com.theredpixelteam.kraitudao.annotations.*;
@@ -30,6 +30,9 @@ import com.theredpixelteam.kraitudao.annotations.metadata.Metadata;
 import com.theredpixelteam.kraitudao.annotations.metadata.MetadataCollection;
 import com.theredpixelteam.kraitudao.annotations.metadata.common.IgnoreWhenEquals;
 import com.theredpixelteam.kraitudao.dataobject.*;
+import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
+import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
+import com.theredpixelteam.kraitudao.interpreter.DataObjectMalformationException;
 import com.theredpixelteam.redtea.predication.MultiCondition;
 import com.theredpixelteam.redtea.predication.MultiPredicate;
 import com.theredpixelteam.redtea.predication.NamedPredicate;
@@ -115,183 +118,6 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             throw new DataObjectMalformationException("Type: " + type.getCanonicalName() + " is not annotated by @Element");
 
         return getElement0(type);
-    }
-
-    @Override
-    public Optional<Map<String, ValueObject>> expand(ValueObject valueObject) throws DataObjectInterpretationException
-    {
-        ExpandRule expandRule = valueObject.getExpandRule().orElse(null);
-
-        if(expandRule == null)
-            return Optional.empty();
-
-        DataObject dataObject = valueObject.getOwner();
-
-        Map<String, ValueObject> map = new HashMap<>();
-        for(ExpandRule.Entry entry : expandRule.getEntries())
-        {
-            Class<?> type = entry.getExpandedType();
-            String name = entry.name();
-
-            ValueObjectContainer valueObjectContainer = new ValueObjectContainer(dataObject.getType(), type, REFLECTION_COMPATIBLE_TYPES.get(type));
-            valueObjectContainer.name = name;
-            valueObjectContainer.primaryKey = valueObject.isPrimaryKey();
-            valueObjectContainer.secondaryKey = valueObject.isSecondaryKey();
-            valueObjectContainer.owner = valueObject.getOwner();
-            valueObjectContainer.metadata = entry.getMetadataMap();
-
-            expand(dataObject, valueObject, valueObjectContainer, entry);
-
-            valueObjectContainer.seal();
-
-            map.put(valueObjectContainer.getName(), valueObjectContainer);
-        }
-
-        return Optional.of(map);
-    }
-
-    @Override
-    public DataObject expand(DataObject dataObject) throws DataObjectInterpretationException
-    {
-        DataObjectContainer dataObjectContainer;
-
-        if(dataObject instanceof MultipleDataObject)
-        {
-            MultipleDataObject multipleDataObject = (MultipleDataObject) dataObject;
-            dataObjectContainer = new MultipleDataObjectContainer(dataObject.getType());
-
-            dataObjectContainer.putKey(KeyType.PRIMARY, multipleDataObject.getPrimaryKey());
-
-            for(ValueObject secondaryKey : multipleDataObject.getSecondaryKeys().values())
-            {
-                Optional<Map<String, ValueObject>> map = expand(secondaryKey);
-
-                if(!map.isPresent())
-                    dataObjectContainer.putKey(KeyType.SECONDARY, secondaryKey);
-                else for(ValueObject expandedSecondaryKey : map.get().values())
-                    dataObjectContainer.putKey(KeyType.SECONDARY, expandedSecondaryKey);
-            }
-        }
-        else if(dataObject instanceof UniqueDataObject)
-        {
-            UniqueDataObject uniqueDataObject = (UniqueDataObject) dataObject;
-            dataObjectContainer = new UniqueDataObjectContainer(dataObject.getType());
-
-            dataObjectContainer.putKey(KeyType.UNIQUE, uniqueDataObject.getKey());
-        }
-        else
-            throw new DataObjectMalformationException.IllegalType();
-
-        for(ValueObject value : dataObject.getValues().values())
-        {
-            Optional<Map<String, ValueObject>> map = expand(value);
-
-            if (!map.isPresent())
-                dataObjectContainer.putValue(value);
-            else for(ValueObject expandedValueObject : map.get().values())
-                dataObjectContainer.putValue(expandedValueObject);
-        }
-
-        return dataObjectContainer;
-    }
-
-    private static void expand(DataObject dataObject,
-                               ValueObject origin,
-                               ValueObjectContainer valueObjectContainer,
-                               ExpandRule.Entry entry)
-            throws DataObjectInterpretationException
-    {
-        Method m0, m1;
-        Class<?> type = entry.getExpandedType();
-
-        ExpandRule.At getter = entry.getterInfo();
-        ExpandRule.At setter = entry.setterInfo();
-
-        switch(getter.source())
-        {
-            case THIS:
-                try {
-                    checkReturnType(m0 = dataObject.getType().getMethod(getter.name(), type), type);
-                } catch (NoSuchMethodException e) {
-                    throw new DataObjectMalformationException(String.format("Expanding (Name: %s, Entry: %s)",
-                            valueObjectContainer.getName(),
-                            entry.name()), e);
-                }
-
-                valueObjectContainer.getter = (object) -> {
-                    try {
-                        return m0.invoke(object, origin.get(object));
-                    } catch (Exception e) {
-                        throw new DataObjectError("Reflection error", e);
-                    }
-                };
-                break;
-
-            case FIELD:
-                try {
-                    checkReturnType(m0 = origin.getType().getMethod(getter.name()), type);
-                } catch (NoSuchMethodException e) {
-                    throw new DataObjectMalformationException(String.format("Expanding (Name: %s, Entry: %s)",
-                            valueObjectContainer.getName(),
-                            entry.name()), e);
-                }
-
-                valueObjectContainer.getter = (object) -> {
-                    try {
-                        return m0.invoke(origin.get(object));
-                    } catch (Exception e) {
-                        throw new DataObjectError("Reflection error", e);
-                    }
-                };
-                break;
-        }
-
-        switch(setter.source())
-        {
-            case THIS:
-                try {
-                    m1 = dataObject.getType().getMethod(setter.name(), origin.getType(), type);
-                } catch (NoSuchMethodException e) {
-                    throw new DataObjectMalformationException(String.format("Expanding (Name: %s, Entry: %s)",
-                            valueObjectContainer.getName(),
-                            entry.name()), e);
-                }
-
-                valueObjectContainer.setter = (object, value) -> {
-                    try {
-                        m1.invoke(object, origin.get(object), value);
-                    } catch (Exception e) {
-                        throw new DataObjectError("Reflection error", e);
-                    }
-                };
-                break;
-
-            case FIELD:
-                try {
-                    m1 = origin.getType().getMethod(setter.name(), type);
-                } catch (NoSuchMethodException e) {
-                    throw new DataObjectMalformationException(String.format("Expanding secondary key (Name: %s, Entry: %s)",
-                            valueObjectContainer.getName(),
-                            entry.name()), e);
-                }
-
-                valueObjectContainer.setter = (object, value) -> {
-                    try {
-                        m1.invoke(origin.get(object), value);
-                    } catch (Exception e) {
-                        throw new DataObjectError("Reflection error", e);
-                    }
-                };
-                break;
-        }
-    }
-
-    private static void checkReturnType(Method method, Class<?> required) throws NoSuchMethodException
-    {
-        if(!method.getReturnType().equals(required))
-            throw new NoSuchMethodException(String.format("Incompatible return type (Found: %s, Required: %s)",
-                    method.getReturnType().getCanonicalName(),
-                    required.getCanonicalName()));
     }
 
     private MultipleDataObject getMultiple0(Class<?> type) throws DataObjectInterpretationException
@@ -1122,7 +948,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
                     .next(a(OverrideSetter.class))
             .build());
 
-    private static interface DataObjectContainer extends DataObject
+    static interface DataObjectContainer extends DataObject
     {
         void putKey(KeyType type, ValueObject valueObject) throws DataObjectInterpretationException;
 
@@ -1139,11 +965,11 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         }
     }
 
-    private static class GlobalExpandRules extends HashMap<Class<?>, ExpandRule>
+    static class GlobalExpandRules extends HashMap<Class<?>, ExpandRule>
     {
     }
 
-    private static class ElementDataObjectContainer implements ElementDataObject, DataObjectContainer
+    static class ElementDataObjectContainer implements ElementDataObject, DataObjectContainer
     {
         ElementDataObjectContainer(Class<?> type)
         {
@@ -1214,7 +1040,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         private boolean sealed;
     }
 
-    private static class UniqueDataObjectContainer implements UniqueDataObject, DataObjectContainer
+    static class UniqueDataObjectContainer implements UniqueDataObject, DataObjectContainer
     {
         UniqueDataObjectContainer(Class<?> type)
         {
@@ -1306,7 +1132,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         private boolean sealed;
     }
 
-    private static class MultipleDataObjectContainer implements MultipleDataObject, DataObjectContainer
+    static class MultipleDataObjectContainer implements MultipleDataObject, DataObjectContainer
     {
         MultipleDataObjectContainer(Class<?> type)
         {
@@ -1422,7 +1248,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         private boolean sealed;
     }
 
-    private static class ValueObjectContainer implements ValueObject
+    static class ValueObjectContainer implements ValueObject
     {
         ValueObjectContainer(Class<?> owner, Class<?> type, Class<?> compatibleType)
         {
@@ -1598,34 +1424,34 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
 
         Setter setter;
 
-        private Map<Class<?>, Annotation> metadata;
+        Map<Class<?>, Annotation> metadata;
 
         private boolean sealed;
 
-        private static interface Getter
+        static interface Getter
         {
             Object get(Object object);
         }
 
-        private static interface RedirectedGetter extends Getter, RedirectedElement
+        static interface RedirectedGetter extends Getter, RedirectedElement
         {
         }
 
-        private static interface Setter
+        static interface Setter
         {
             void set(Object object, Object value);
         }
 
-        private static interface RedirectedSetter extends Setter, RedirectedElement
+        static interface RedirectedSetter extends Setter, RedirectedElement
         {
         }
 
-        private static interface RedirectedElement
+        static interface RedirectedElement
         {
             Class<?> source();
         }
 
-        private static class RedirectedGetterContainer implements RedirectedGetter, RedirectedElement
+        static class RedirectedGetterContainer implements RedirectedGetter, RedirectedElement
         {
             RedirectedGetterContainer(Class<?> source, Getter getter)
             {
@@ -1650,7 +1476,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             private final Getter getter;
         }
 
-        private static class RedirectedSetterContainer implements RedirectedSetter, RedirectedElement
+        static class RedirectedSetterContainer implements RedirectedSetter, RedirectedElement
         {
             RedirectedSetterContainer(Class<?> source, Setter setter)
             {
@@ -1676,7 +1502,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         }
     }
 
-    private static class ExpandRuleContainer implements ExpandRule
+    static class ExpandRuleContainer implements ExpandRule
     {
         ExpandRuleContainer(Class<?> type)
         {
@@ -1715,7 +1541,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         private boolean sealed;
     }
 
-    private static class EntryContainer implements ExpandRule.Entry
+    static class EntryContainer implements ExpandRule.Entry
     {
         EntryContainer(String name, Class<?> expandedType)
         {
@@ -1812,7 +1638,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         }
     }
 
-    private static class InheritanceInfo
+    static class InheritanceInfo
     {
         InheritanceInfo(InheritValue info)
         {
@@ -1936,14 +1762,14 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         private final Expandable expanding;
     }
 
-    private static enum KeyType
+    static enum KeyType
     {
         UNIQUE,
         PRIMARY,
         SECONDARY
     }
 
-    private static final Map<Class<?>, Class<?>> REFLECTION_COMPATIBLE_TYPES = new HashMap<Class<?>, Class<?>>()
+    static final Map<Class<?>, Class<?>> REFLECTION_COMPATIBLE_TYPES = new HashMap<Class<?>, Class<?>>()
     {
         {
             put(boolean.class, Boolean.class);

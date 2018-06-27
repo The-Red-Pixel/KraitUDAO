@@ -26,12 +26,11 @@ import com.theredpixelteam.kraitudao.DataSourceException;
 import com.theredpixelteam.kraitudao.Transaction;
 import com.theredpixelteam.kraitudao.common.sql.*;
 import com.theredpixelteam.kraitudao.dataobject.*;
+import com.theredpixelteam.kraitudao.interpreter.DataObjectExpander;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
-import com.theredpixelteam.kraitudao.interpreter.StandardDataObjectInterpreter;
-import com.theredpixelteam.redtea.function.FunctionWithThrowable;
-import com.theredpixelteam.redtea.function.ProcedureWithThrowable;
-import com.theredpixelteam.redtea.function.SupplierWithThrowable;
+import com.theredpixelteam.kraitudao.interpreter.common.StandardDataObjectExpander;
+import com.theredpixelteam.kraitudao.interpreter.common.StandardDataObjectInterpreter;
 import com.theredpixelteam.redtea.util.Pair;
 
 import java.sql.Connection;
@@ -42,6 +41,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     public PlainSQLDatabaseDataSource(Connection connection,
                                       String tableName,
                                       DataObjectInterpreter interpreter,
+                                      DataObjectExpander expander,
                                       DataObjectContainer container,
                                       DatabaseManipulator databaseManipulator,
                                       DataArgumentWrapper argumentWrapper,
@@ -51,6 +51,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         this.connection = connection;
         this.tableName = tableName;
         this.interpreter = interpreter;
+        this.expander = expander;
         this.container = container;
         this.manipulator = databaseManipulator;
         this.argumentWrapper = argumentWrapper;
@@ -66,35 +67,38 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     public PlainSQLDatabaseDataSource(Connection connection,
                                       String tableName,
                                       DataObjectInterpreter interpreter,
+                                      DataObjectExpander expander,
                                       DataObjectContainer container,
                                       DatabaseManipulator databaseManipulator)
             throws DataSourceException
     {
-        this(connection, tableName, interpreter, container, databaseManipulator, DefaultDataArgumentWrapper.INSTANCE, DefaultDataExtractorFactory.INSTANCE);
+        this(connection, tableName, interpreter, expander, container, databaseManipulator, DefaultDataArgumentWrapper.INSTANCE, DefaultDataExtractorFactory.INSTANCE);
     }
 
     public PlainSQLDatabaseDataSource(Connection connection,
                                       String tableName,
                                       DataObjectInterpreter interpreter,
+                                      DataObjectExpander expander,
                                       DataObjectContainer container)
             throws DataSourceException
     {
-        this(connection, tableName, interpreter, container, DefaultDatabaseManipulator.INSTANCE);
+        this(connection, tableName, interpreter, expander, container, DefaultDatabaseManipulator.INSTANCE);
     }
 
     public PlainSQLDatabaseDataSource(Connection connection,
                                       String tableName,
-                                      DataObjectInterpreter interpreter)
+                                      DataObjectInterpreter interpreter,
+                                      DataObjectExpander expander)
             throws DataSourceException
     {
-        this(connection, tableName, interpreter, DataObjectCache.getGlobal());
+        this(connection, tableName, interpreter, expander, DataObjectCache.getGlobal());
     }
 
     public PlainSQLDatabaseDataSource(Connection connection,
                                       String tableName)
             throws DataSourceException
     {
-        this(connection, tableName, StandardDataObjectInterpreter.INSTANCE, DataObjectCache.getGlobal());
+        this(connection, tableName, StandardDataObjectInterpreter.INSTANCE, StandardDataObjectExpander.INSTANCE);
     }
 
     public Connection getConnection()
@@ -196,7 +200,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
     private boolean createTable0(Connection connection, DataObject dataObject, boolean ifNotExists) throws DataSourceException
     {
-
+        return false;
     }
 
     public DatabaseManipulator getManipulator()
@@ -237,6 +241,8 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
     protected DataObjectInterpreter interpreter;
 
+    protected DataObjectExpander expander;
+
     protected final DataObjectContainer container;
 
     protected DatabaseManipulator manipulator;
@@ -244,50 +250,6 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     protected DataArgumentWrapper argumentWrapper;
 
     protected DataExtractorFactory extractorFactory;
-
-    private class Node
-    {
-        Node(ProcedureWithThrowable<SQLException> procedure)
-        {
-            this(procedure, new HashMap<>());
-        }
-
-        Node(ProcedureWithThrowable<SQLException> procedure, Map<Class<?>, FunctionWithThrowable<String, String, SQLException>> cache)
-        {
-            this.procedure = procedure;
-            this.children = new ArrayList<>();
-            this.cache = cache;
-        }
-
-        void run() throws SQLException
-        {
-            procedure.run();
-
-            for(Node node : children)
-                node.run();
-        }
-
-        void append(ProcedureWithThrowable<SQLException> procedure)
-        {
-            children.add(new Node(procedure, cache));
-        }
-
-        Optional<SupplierWithThrowable<String, SQLException>> getCache(Class<?> type, String tableName)
-        {
-            FunctionWithThrowable<String, String, SQLException> cached;
-
-            if((cached = cache.get(type)) == null)
-                return Optional.empty();
-
-            return Optional.of(() -> cached.apply(tableName));
-        }
-
-        final Map<Class<?>, FunctionWithThrowable<String, String, SQLException>> cache;
-
-        final ProcedureWithThrowable<SQLException> procedure;
-
-        final ArrayList<Node> children;
-    }
 
     private class TransactionImpl implements Transaction
     {
