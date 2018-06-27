@@ -21,9 +21,11 @@
 
 package com.theredpixelteam.kraitudao.dataobject;
 
+import com.theredpixelteam.kraitudao.interpreter.DataObjectExpander;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
 
+import java.util.Map;
 import java.util.Optional;
 
 public interface DataObjectContainer {
@@ -42,6 +44,13 @@ public interface DataObjectContainer {
     {
         return get(type).orElse(interpret(type, interpreter));
     }
+
+    public Optional<Map<String, ValueObject>> expand(ValueObject valueObject, DataObjectExpander expander)
+            throws DataObjectInterpretationException;
+
+    public DataObject expand(DataObject dataObject, DataObjectExpander expander)
+            throws DataObjectInterpretationException;
+
     public boolean remove(Class<?> type);
 
     public boolean remove(Class<?> type, DataObject dataObject);

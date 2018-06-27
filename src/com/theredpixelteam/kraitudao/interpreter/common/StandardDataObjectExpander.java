@@ -27,8 +27,8 @@ public class StandardDataObjectExpander implements DataObjectExpander {
             Class<?> type = entry.getExpandedType();
             String name = entry.name();
 
-            StandardDataObjectInterpreter.ValueObjectContainer valueObjectContainer =
-                    new StandardDataObjectInterpreter.ValueObjectContainer(dataObject.getType(), type, StandardDataObjectInterpreter.REFLECTION_COMPATIBLE_TYPES.get(type));
+            ExpandedValueObjectContainer valueObjectContainer =
+                    new ExpandedValueObjectContainer(dataObject.getType(), type, StandardDataObjectInterpreter.REFLECTION_COMPATIBLE_TYPES.get(type), valueObject);
             valueObjectContainer.name = name;
             valueObjectContainer.primaryKey = valueObject.isPrimaryKey();
             valueObjectContainer.secondaryKey = valueObject.isSecondaryKey();
@@ -95,7 +95,7 @@ public class StandardDataObjectExpander implements DataObjectExpander {
 
     private static void expand(DataObject dataObject,
                                ValueObject origin,
-                               StandardDataObjectInterpreter.ValueObjectContainer valueObjectContainer,
+                               ExpandedValueObjectContainer valueObjectContainer,
                                ExpandRule.Entry entry)
             throws DataObjectInterpretationException
     {
@@ -190,6 +190,23 @@ public class StandardDataObjectExpander implements DataObjectExpander {
             throw new NoSuchMethodException(String.format("Incompatible return type (Found: %s, Required: %s)",
                     method.getReturnType().getCanonicalName(),
                     required.getCanonicalName()));
+    }
+
+    static class ExpandedValueObjectContainer extends StandardDataObjectInterpreter.ValueObjectContainer implements ExpandedValueObject
+    {
+        ExpandedValueObjectContainer(Class<?> owner, Class<?> type, Class<?> compatibleType, ValueObject source)
+        {
+            super(owner, type, compatibleType);
+            this.source = source;
+        }
+
+        @Override
+        public ValueObject getSource()
+        {
+            return source;
+        }
+
+        final ValueObject source;
     }
 
     public static final StandardDataObjectExpander INSTANCE = new StandardDataObjectExpander();
