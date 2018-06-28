@@ -21,6 +21,7 @@
 
 package com.theredpixelteam.kraitudao.common;
 
+import com.theredpixelteam.kraitudao.Constructor;
 import com.theredpixelteam.kraitudao.DataSource;
 import com.theredpixelteam.kraitudao.DataSourceException;
 import com.theredpixelteam.kraitudao.Transaction;
@@ -47,17 +48,28 @@ public final class DataSourceUtil {
         }
 
         @Override
-        public synchronized <T> boolean pull(T object, Class<T> type)
-                throws DataSourceException
+        public synchronized <T> void pull(T object) throws DataSourceException
+        {
+            this.object.pull(object);
+        }
+
+        @Override
+        public synchronized <T> boolean pull(T object, Class<T> type) throws DataSourceException
         {
             return this.object.pull(object, type);
         }
 
         @Override
-        public synchronized <T> Collection<T> pull(Class<T> type)
-                throws DataSourceException
+        public synchronized <T> Collection<T> pull(Class<T> type) throws DataSourceException
         {
             return this.object.pull(type);
+        }
+
+        @Override
+        public synchronized <T> Collection<T> pull(Class<T> type, Constructor<T> constructor)
+                throws DataSourceException
+        {
+            return this.object.pull(type, constructor);
         }
 
         @Override
@@ -68,10 +80,40 @@ public final class DataSourceUtil {
         }
 
         @Override
-        public <T> Collection<T> pullVaguely(T object, Class<T> type)
+        public synchronized <T> Collection<T> pullVaguely(T object, Class<T> type) throws DataSourceException
+        {
+            return this.pullVaguely(object, type);
+        }
+
+        @Override
+        public synchronized <T> Collection<T> pullVaguely(T object, Class<T> type, Constructor<T> constructor)
                 throws DataSourceException
         {
-            return this.object.pullVaguely(object, type);
+            return this.object.pullVaguely(object, type, constructor);
+        }
+
+        @Override
+        public synchronized <T> Transaction commit(T object) throws DataSourceException
+        {
+            return this.object.commit(object);
+        }
+
+        @Override
+        public synchronized <T> void commitInstantly(T object) throws DataSourceException
+        {
+            this.object.commitInstantly(object);
+        }
+
+        @Override
+        public synchronized <T> Transaction commit(Transaction transaction, T object) throws DataSourceException
+        {
+            return this.object.commit(transaction, object);
+        }
+
+        @Override
+        public synchronized <T> void commitInstantly(Transaction transaction, T object) throws DataSourceException
+        {
+            this.object.commitInstantly(transaction, object);
         }
 
         @Override
@@ -82,10 +124,22 @@ public final class DataSourceUtil {
         }
 
         @Override
+        public synchronized <T> void commitInstantly(T object, Class<T> type) throws DataSourceException
+        {
+            this.object.commitInstantly(object, type);
+        }
+
+        @Override
         public synchronized <T> Transaction commit(Transaction transition, T object, Class<T> type)
                 throws DataSourceException
         {
             return this.object.commit(transition, object, type);
+        }
+
+        @Override
+        public synchronized <T> void commitInstantly(Transaction transaction, T object, Class<T> type) throws DataSourceException
+        {
+            this.object.commitInstantly(transaction, object, type);
         }
 
         @Override
@@ -96,6 +150,24 @@ public final class DataSourceUtil {
         }
 
         @Override
+        public synchronized <T> void removeInstantly(T object) throws DataSourceException
+        {
+            this.object.removeInstantly(object);
+        }
+
+        @Override
+        public synchronized <T> Transaction remove(T object, Class<T> type) throws DataSourceException
+        {
+            return this.object.remove(object, type);
+        }
+
+        @Override
+        public synchronized <T> void removeInstantly(T object, Class<T> type) throws DataSourceException
+        {
+            this.object.removeInstantly(object, type);
+        }
+
+        @Override
         public synchronized <T> Transaction remove(Transaction transition, T object)
                 throws DataSourceException
         {
@@ -103,10 +175,22 @@ public final class DataSourceUtil {
         }
 
         @Override
-        public <T> Transaction remove(Transaction transaction, T object, Class<T> type)
+        public synchronized <T> void removeInstantly(Transaction transaction, T object) throws DataSourceException
+        {
+            this.object.removeInstantly(transaction, object);
+        }
+
+        @Override
+        public synchronized <T> Transaction remove(Transaction transaction, T object, Class<T> type)
                 throws DataSourceException
         {
             return this.object.remove(transaction, object, type);
+        }
+
+        @Override
+        public synchronized <T> void removeInstantly(Transaction transaction, T object, Class<T> type) throws DataSourceException
+        {
+            this.object.removeInstantly(transaction, object, type);
         }
 
         @Override
@@ -116,9 +200,21 @@ public final class DataSourceUtil {
         }
 
         @Override
+        public synchronized void clearInstantly() throws DataSourceException
+        {
+            this.object.clearInstantly();
+        }
+
+        @Override
         public synchronized Transaction clear(Transaction transition) throws DataSourceException
         {
             return this.object.clear(transition);
+        }
+
+        @Override
+        public synchronized void clearInstantly(Transaction transaction) throws DataSourceException
+        {
+            this.object.clearInstantly(transaction);
         }
 
         @Override
@@ -129,6 +225,12 @@ public final class DataSourceUtil {
         }
 
         @Override
+        public synchronized <T> Transaction removeVaguely(T object, Class<T> type) throws DataSourceException
+        {
+            return this.object.removeVaguely(object, type);
+        }
+
+        @Override
         public synchronized <T> Transaction removeVaguely(Transaction transition, T object)
                 throws DataSourceException
         {
@@ -136,7 +238,7 @@ public final class DataSourceUtil {
         }
 
         @Override
-        public <T> Transaction removeVaguely(Transaction transaction, T object, Class<T> type)
+        public synchronized <T> Transaction removeVaguely(Transaction transaction, T object, Class<T> type)
                 throws DataSourceException
         {
             return this.object.removeVaguely(transaction, object, type);
