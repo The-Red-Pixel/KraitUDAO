@@ -21,6 +21,7 @@
 
 package com.theredpixelteam.kraitudao.common;
 
+import com.theredpixelteam.kraitudao.Constructor;
 import com.theredpixelteam.kraitudao.DataSource;
 import com.theredpixelteam.kraitudao.DataSourceException;
 import com.theredpixelteam.kraitudao.Transaction;
@@ -129,13 +130,13 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     }
 
     @Override
-    public <T> Collection<T> pull(Class<T> type) throws DataSourceException
+    public <T> Collection<T> pull(Class<T> type, Constructor<T> constructor) throws DataSourceException
     {
         return null;
     }
 
     @Override
-    public <T> Collection<T> pullVaguely(T object, Class<T> type)
+    public <T> Collection<T> pullVaguely(T object, Class<T> type, Constructor<T> constructor)
             throws DataSourceException
     {
         return null;
@@ -202,8 +203,13 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         return createTable0(connection, dataObject, true);
     }
 
-    @SuppressWarnings("unchecked")
     private boolean createTable0(Connection connection, DataObject dataObject, boolean ifNotExists) throws DataSourceException
+    {
+        return createTable0(connection, tableName, dataObject, ifNotExists);
+    }
+
+    @SuppressWarnings("unchecked")
+    private boolean createTable0(Connection connection, String tableName, DataObject dataObject, boolean ifNotExists) throws DataSourceException
     {
         try {
             List<Constraint> tableConstraints = new ArrayList<>();

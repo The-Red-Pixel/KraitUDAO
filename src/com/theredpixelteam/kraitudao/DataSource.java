@@ -21,8 +21,6 @@
 
 package com.theredpixelteam.kraitudao;
 
-import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
-
 import java.util.Collection;
 
 @SuppressWarnings("unchecked")
@@ -34,14 +32,24 @@ public interface DataSource {
 
     public <T> boolean pull(T object, Class<T> type) throws DataSourceException;
 
-    public <T> Collection<T> pull(Class<T> type) throws DataSourceException;
+    public default <T> Collection<T> pull(Class<T> type) throws DataSourceException
+    {
+        return pull(type, type::newInstance);
+    }
+
+    public <T> Collection<T> pull(Class<T> type, Constructor<T> constructor) throws DataSourceException;
 
     public default <T> Collection<T> pullVaguely(T object) throws DataSourceException
     {
         return pullVaguely(object, (Class<T>)object.getClass());
     }
 
-    public <T> Collection<T> pullVaguely(T object, Class<T> type) throws DataSourceException;
+    public default <T> Collection<T> pullVaguely(T object, Class<T> type) throws DataSourceException
+    {
+        return pullVaguely(object, type, type::newInstance);
+    }
+
+    public <T> Collection<T> pullVaguely(T object, Class<T> type, Constructor<T> constructor) throws DataSourceException;
 
     public default <T> Transaction commit(T object) throws DataSourceException
     {
