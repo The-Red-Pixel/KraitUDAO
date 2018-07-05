@@ -37,8 +37,10 @@ import com.theredpixelteam.kraitudao.interpreter.common.StandardDataObjectExpand
 import com.theredpixelteam.kraitudao.interpreter.common.StandardDataObjectInterpreter;
 import com.theredpixelteam.redtea.util.Pair;
 import com.theredpixelteam.redtea.util.Vector3;
+import com.theredpixelteam.redtea.util.concurrent.Increment;
 
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
 
@@ -123,13 +125,33 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             throw new DataSourceException.Busy();
     }
 
+    private void extract(ResultSet resultSet, Object object, ValueObject valueObject, Class<?>[] signatured, Increment signaturePointer)
+            throws DataSourceException
+    {
+
+    }
+
     @Override
     public <T> boolean pull(T object, Class<T> type) throws DataSourceException
     {
         try {
             DataObject dataObject = container.interpretIfAbsent(type, interpreter);
 
-            // TODO
+            if (dataObject instanceof ElementDataObject)
+            {
+                Set<String> valueSet = dataObject.getValues().keySet();
+                String[] values = valueSet.toArray(new String[valueSet.size()]);
+
+                try (ResultSet resultSet = manipulator.query(connection, tableName, null, values)) {
+                    for (ValueObject valueObject : dataObject.getValues().values())
+                        extract(resultSet, object, valueObject, null, null);
+                } catch (SQLException e) {
+                    throw new DataSourceException("SQLException", e);
+                }
+
+                return true;
+            }
+
             return false;
         } catch (DataObjectInterpretationException e) {
             throw new DataSourceException(e);

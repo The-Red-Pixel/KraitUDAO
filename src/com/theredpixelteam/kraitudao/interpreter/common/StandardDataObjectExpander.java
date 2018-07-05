@@ -201,6 +201,15 @@ public class StandardDataObjectExpander implements DataObjectExpander {
         }
 
         @Override
+        void seal() throws DataObjectInterpretationException
+        {
+            if (source == null)
+                throw new DataObjectMalformationException("Null source of expanded value object");
+
+            super.seal();
+        }
+
+        @Override
         public ValueObject getSource()
         {
             return source;

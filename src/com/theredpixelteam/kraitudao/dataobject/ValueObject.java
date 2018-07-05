@@ -51,4 +51,8 @@ public interface ValueObject extends Metadatable {
 
     public Optional<ExpandRule> getExpandRule();
 
+    public default boolean isExpandable()
+    {
+        return getExpandRule().isPresent();
+    }
 }
