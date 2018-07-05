@@ -126,11 +126,31 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     @Override
     public <T> boolean pull(T object, Class<T> type) throws DataSourceException
     {
+        try {
+            DataObject dataObject = container.interpretIfAbsent(type, interpreter);
+
+            // TODO
+            return false;
+        } catch (DataObjectInterpretationException e) {
+            throw new DataSourceException(e);
+        }
+    }
+
+    @Override
+    public <T> boolean pull(T object, Class<T> type, Class<?>... signatured) throws DataSourceException
+    {
         return false;
     }
 
     @Override
     public <T> Collection<T> pull(Class<T> type, Constructor<T> constructor) throws DataSourceException
+    {
+        return null;
+    }
+
+    @Override
+    public <T> Collection<T> pull(Class<T> type, Constructor<T> constructor, Class<?>... signatured)
+            throws DataSourceException
     {
         return null;
     }
@@ -144,6 +164,13 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
     @Override
     public <T> Transaction commit(Transaction transaction, T object, Class<T> type)
+            throws DataSourceException
+    {
+        return null;
+    }
+
+    @Override
+    public <T> Transaction commit(Transaction transaction, T object, Class<T> type, Class<?>... signatured)
             throws DataSourceException
     {
         return null;
@@ -323,9 +350,11 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
     private static final Map<Class<?>, Class<?>> REMAPPED = new HashMap<Class<?>, Class<?>>() {
         {
-            put(Map.class, String.class);
-            put(List.class, String.class);
-            put(Set.class, String.class);
+            put(Map.class,          String.class);
+            put(List.class,         String.class);
+            put(Set.class,          String.class);
+            put(Hashtable.class,    String.class);
+            put(Vector.class,       String.class);
         }
     };
 

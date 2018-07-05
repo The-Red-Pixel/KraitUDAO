@@ -32,12 +32,16 @@ public interface DataSource {
 
     public <T> boolean pull(T object, Class<T> type) throws DataSourceException;
 
+    public <T> boolean pull(T object, Class<T> type, Class<?>... signatured) throws DataSourceException;
+
     public default <T> Collection<T> pull(Class<T> type) throws DataSourceException
     {
         return pull(type, type::newInstance);
     }
 
     public <T> Collection<T> pull(Class<T> type, Constructor<T> constructor) throws DataSourceException;
+
+    public <T> Collection<T> pull(Class<T> type, Constructor<T> constructor, Class<?>... signatured) throws DataSourceException;
 
     public default <T> Collection<T> pullVaguely(T object) throws DataSourceException
     {
@@ -76,12 +80,24 @@ public interface DataSource {
         return commit(null, object, type);
     }
 
+    public default <T> Transaction commit(T object, Class<T> type, Class<?>... signatured) throws DataSourceException
+    {
+        return commit(null, object, type, signatured);
+    }
+
     public default <T> void commitInstantly(T object, Class<T> type) throws DataSourceException
     {
         commit(object, type).push();
     }
 
+    public default <T> void commitInstantly(T object, Class<T> type, Class<?>... signatured) throws DataSourceException
+    {
+        commit(object, type, signatured).push();
+    }
+
     public <T> Transaction commit(Transaction transaction, T object, Class<T> type) throws DataSourceException;
+
+    public <T> Transaction commit(Transaction transaction, T object, Class<T> type, Class<?>... signatured) throws DataSourceException;
 
     public default <T> void commitInstantly(Transaction transaction, T object, Class<T> type) throws DataSourceException
     {
