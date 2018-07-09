@@ -60,6 +60,12 @@ public final class DataSourceUtil {
         }
 
         @Override
+        public synchronized <T> boolean pull(T object, Class<T> type, Class<?>... signatured) throws DataSourceException
+        {
+            return this.object.pull(object, type, signatured);
+        }
+
+        @Override
         public synchronized <T> Collection<T> pull(Class<T> type) throws DataSourceException
         {
             return this.object.pull(type);
@@ -70,6 +76,13 @@ public final class DataSourceUtil {
                 throws DataSourceException
         {
             return this.object.pull(type, constructor);
+        }
+
+        @Override
+        public synchronized <T> Collection<T> pull(Class<T> type, Constructor<T> constructor, Class<?>... signatured)
+                throws DataSourceException
+        {
+            return this.object.pull(type, constructor, signatured);
         }
 
         @Override
@@ -124,9 +137,21 @@ public final class DataSourceUtil {
         }
 
         @Override
+        public synchronized <T> Transaction commit(T object, Class<T> type, Class<?>... signatured) throws DataSourceException
+        {
+            return this.object.commit(object, type, signatured);
+        }
+
+        @Override
         public synchronized <T> void commitInstantly(T object, Class<T> type) throws DataSourceException
         {
             this.object.commitInstantly(object, type);
+        }
+
+        @Override
+        public synchronized <T> void commitInstantly(T object, Class<T> type, Class<?>... signatured) throws DataSourceException
+        {
+            this.object.commitInstantly(object, type, signatured);
         }
 
         @Override
@@ -134,6 +159,13 @@ public final class DataSourceUtil {
                 throws DataSourceException
         {
             return this.object.commit(transition, object, type);
+        }
+
+        @Override
+        public synchronized <T> Transaction commit(Transaction transaction, T object, Class<T> type, Class<?>... signatured)
+                throws DataSourceException
+        {
+            return this.object.commit(transaction, object, type, signatured);
         }
 
         @Override

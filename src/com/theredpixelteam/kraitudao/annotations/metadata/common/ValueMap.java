@@ -5,21 +5,24 @@ import com.theredpixelteam.kraitudao.annotations.metadata.Metadata;
 import com.theredpixelteam.kraitudao.annotations.metadata.MetadataCollection;
 
 import java.lang.annotation.*;
+import java.util.HashMap;
 
 @Metadata
+@Target(ElementType.FIELD)
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.FIELD})
-@Repeatable(TypeSignature.RepeatableTypeSignature.class)
-public @interface TypeSignature {
+@Repeatable(ValueMap.ValueMapRepeatable.class)
+public @interface ValueMap {
     @ExpandedName
-    public String name() default "";
+    public String name();
 
     public Class<?>[] signatured();
 
+    public Class<?> type() default HashMap.class;
+
+    @MetadataCollection(ValueMap.class)
+    @Target(ElementType.FIELD)
     @Retention(RetentionPolicy.RUNTIME)
-    @Target({ElementType.FIELD})
-    @MetadataCollection(TypeSignature.class)
-    public @interface RepeatableTypeSignature {
-        TypeSignature[] value();
+    public @interface ValueMapRepeatable {
+        public ValueMap[] value();
     }
 }

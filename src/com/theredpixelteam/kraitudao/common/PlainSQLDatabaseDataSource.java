@@ -128,7 +128,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     private void extract(ResultSet resultSet, Object object, ValueObject valueObject, Class<?>[] signatured, Increment signaturePointer)
             throws DataSourceException
     {
-
+        Class<?> dataType = valueObject.getType();
     }
 
     @Override
@@ -375,8 +375,8 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             put(Map.class,          String.class);
             put(List.class,         String.class);
             put(Set.class,          String.class);
-            put(Hashtable.class,    String.class);
-            put(Vector.class,       String.class);
+//          put(Hashtable.class,    String.class); actually Map
+//          put(Vector.class,       String.class); actually List
         }
     };
 
