@@ -21,11 +21,10 @@
 
 package com.theredpixelteam.kraitudao.common;
 
-import com.theredpixelteam.kraitudao.Constructor;
 import com.theredpixelteam.kraitudao.DataSource;
 import com.theredpixelteam.kraitudao.DataSourceException;
+import com.theredpixelteam.kraitudao.ObjectConstructor;
 import com.theredpixelteam.kraitudao.Transaction;
-import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
 
 import java.util.Collection;
 import java.util.Optional;
@@ -72,14 +71,14 @@ public final class DataSourceUtil {
         }
 
         @Override
-        public synchronized <T> Collection<T> pull(Class<T> type, Constructor<T> constructor)
+        public synchronized <T> Collection<T> pull(Class<T> type, ObjectConstructor<T> constructor)
                 throws DataSourceException
         {
             return this.object.pull(type, constructor);
         }
 
         @Override
-        public synchronized <T> Collection<T> pull(Class<T> type, Constructor<T> constructor, Class<?>... signatured)
+        public synchronized <T> Collection<T> pull(Class<T> type, ObjectConstructor<T> constructor, Class<?>... signatured)
                 throws DataSourceException
         {
             return this.object.pull(type, constructor, signatured);
@@ -99,7 +98,7 @@ public final class DataSourceUtil {
         }
 
         @Override
-        public synchronized <T> Collection<T> pullVaguely(T object, Class<T> type, Constructor<T> constructor)
+        public synchronized <T> Collection<T> pullVaguely(T object, Class<T> type, ObjectConstructor<T> constructor)
                 throws DataSourceException
         {
             return this.object.pullVaguely(object, type, constructor);

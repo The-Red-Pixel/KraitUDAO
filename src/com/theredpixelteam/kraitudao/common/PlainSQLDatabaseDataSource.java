@@ -21,9 +21,9 @@
 
 package com.theredpixelteam.kraitudao.common;
 
-import com.theredpixelteam.kraitudao.Constructor;
 import com.theredpixelteam.kraitudao.DataSource;
 import com.theredpixelteam.kraitudao.DataSourceException;
+import com.theredpixelteam.kraitudao.ObjectConstructor;
 import com.theredpixelteam.kraitudao.Transaction;
 import com.theredpixelteam.kraitudao.annotations.metadata.common.ExpandForcibly;
 import com.theredpixelteam.kraitudao.annotations.metadata.common.NotNull;
@@ -165,20 +165,20 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     }
 
     @Override
-    public <T> Collection<T> pull(Class<T> type, Constructor<T> constructor) throws DataSourceException
+    public <T> Collection<T> pull(Class<T> type, ObjectConstructor<T> constructor) throws DataSourceException
     {
         return null;
     }
 
     @Override
-    public <T> Collection<T> pull(Class<T> type, Constructor<T> constructor, Class<?>... signatured)
+    public <T> Collection<T> pull(Class<T> type, ObjectConstructor<T> constructor, Class<?>... signatured)
             throws DataSourceException
     {
         return null;
     }
 
     @Override
-    public <T> Collection<T> pullVaguely(T object, Class<T> type, Constructor<T> constructor)
+    public <T> Collection<T> pullVaguely(T object, Class<T> type, ObjectConstructor<T> constructor)
             throws DataSourceException
     {
         return null;
