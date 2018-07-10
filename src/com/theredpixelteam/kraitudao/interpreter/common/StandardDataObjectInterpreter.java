@@ -21,6 +21,7 @@
 
 package com.theredpixelteam.kraitudao.interpreter.common;
 
+import com.theredpixelteam.kraitudao.ObjectConstructor;
 import com.theredpixelteam.kraitudao.PlaceHolder;
 import com.theredpixelteam.kraitudao.annotations.*;
 import com.theredpixelteam.kraitudao.annotations.expandable.*;
@@ -1393,6 +1394,12 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         }
 
         @Override
+        public Optional<ObjectConstructor<?>> getConstructor()
+        {
+            return Optional.ofNullable(objectConstructor);
+        }
+
+        @Override
         public <T extends Annotation> Optional<T> getMetadata(Class<T> type)
         {
             return Optional.ofNullable((T) metadata.get(type));
@@ -1425,6 +1432,8 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         Setter setter;
 
         Map<Class<?>, Annotation> metadata;
+
+        ObjectConstructor<?> objectConstructor;
 
         private boolean sealed;
 

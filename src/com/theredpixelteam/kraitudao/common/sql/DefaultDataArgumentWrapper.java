@@ -21,12 +21,11 @@
 
 package com.theredpixelteam.kraitudao.common.sql;
 
-import com.theredpixelteam.kraitudao.misc.TypeUtil;
+import com.theredpixelteam.kraitudao.misc.Misc;
 
 import java.io.InputStream;
 import java.io.Reader;
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.HashMap;
@@ -39,7 +38,7 @@ public class DefaultDataArgumentWrapper implements DataArgumentWrapper {
     {
         DataArgumentApplier applier;
 
-        Class<?> t = TypeUtil.tryToUnbox(object.getClass());
+        Class<?> t = Misc.tryToUnbox(object.getClass());
 
         BLOCK: {
             do {

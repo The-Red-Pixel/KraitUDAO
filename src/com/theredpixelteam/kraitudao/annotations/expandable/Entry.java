@@ -21,6 +21,10 @@
 
 package com.theredpixelteam.kraitudao.annotations.expandable;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+
+@Retention(RetentionPolicy.RUNTIME)
 public @interface Entry {
     String name();
 

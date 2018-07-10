@@ -1,7 +1,7 @@
 package com.theredpixelteam.kraitudao.common.sql;
 
 import com.theredpixelteam.kraitudao.DataSourceError;
-import com.theredpixelteam.kraitudao.misc.TypeUtil;
+import com.theredpixelteam.kraitudao.misc.Misc;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
@@ -11,7 +11,7 @@ public class DefaultDataTypeParser implements DataTypeParser {
     @Override
     public String parseType(Class<?> dataType)
     {
-        String type = MAPPING.get(TypeUtil.tryToUnbox(dataType));
+        String type = MAPPING.get(Misc.tryToUnbox(dataType));
 
         if(type == null)
             throw new DataSourceError("Unsupported type: " + dataType.getCanonicalName());
@@ -22,7 +22,7 @@ public class DefaultDataTypeParser implements DataTypeParser {
     @Override
     public boolean supportType(Class<?> dataType)
     {
-        return MAPPING.containsKey(TypeUtil.tryToUnbox(dataType));
+        return MAPPING.containsKey(Misc.tryToUnbox(dataType));
     }
 
     private static final Map<Class<?>, String> MAPPING = new HashMap<Class<?>, String>() {
