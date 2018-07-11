@@ -20,21 +20,18 @@ public class Reflection {
         Class<?> methodSource = null;
         FunctionWithThrowable<Object, Object, Exception> objectGetter = null;
 
-        boolean requireStatic = false;
+        boolean requireStatic = false, requireStaticField = false;
 
         switch(metadata.source())
         {
-            case FIELD:
             case STATIC_FIELD: // static
+                requireStaticField = true;
+            case FIELD:
                 try {
                     field = source.getDeclaredField(metadata.field());
                 } catch (NoSuchFieldException e) {
                     return Optional.empty();
                 }
-
-                if ((metadata.source().equals(MethodSource.STATIC_FIELD) && !Modifier.isStatic(field.getModifiers()))
-                        || Modifier.isStatic(field.getModifiers()))
-                    return Optional.empty();
 
             case OUTER_STATIC_FIELD: // static
                 if (field == null)
@@ -50,9 +47,11 @@ public class Reflection {
                         return Optional.empty();
                     }
 
-                    if (!Modifier.isStatic(field.getModifiers()))
-                        return Optional.empty();
+                    requireStaticField = true;
                 }
+
+                if (Modifier.isStatic(field.getModifiers()) != requireStaticField)
+                    return Optional.empty();
 
                 if (metadata.fieldType() != PlaceHolder.class && metadata.fieldType() != field.getType())
                     return Optional.empty();
@@ -112,18 +111,20 @@ public class Reflection {
 
     public static Optional<Assignable> of(Class<?> source, FieldEntry metadata)
     {
+        boolean requireStatic = false;
+
         switch(metadata.source())
         {
-            case THIS:
             case STATIC:
+                requireStatic = true;
+            case THIS:
                 try {
                     Field field = source.getDeclaredField(metadata.name());
 
                     if(metadata.type() != PlaceHolder.class && metadata.type() != field.getType())
                         return Optional.empty();
 
-                    if((metadata.source().equals(FieldSource.STATIC) && !Modifier.isStatic(field.getModifiers()))
-                            || Modifier.isStatic(field.getModifiers()))
+                    if(Modifier.isStatic(field.getModifiers()) != requireStatic)
                         return Optional.empty();
 
                     return Optional.of(new AssignableImpl(field));
@@ -194,7 +195,7 @@ public class Reflection {
     {
         private CallableImpl(Method method, FunctionWithThrowable<Object, Object, Exception> objectGetter, boolean isStatic)
         {
-            this.method = method;
+            (this.method = method).setAccessible(true);
             this.objectGetter = objectGetter;
             this.isStatic = isStatic;
         }
