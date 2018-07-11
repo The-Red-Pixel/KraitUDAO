@@ -1371,7 +1371,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             if(!(type.isInstance(object)))
                 return ThreeStateOptional.empty();
 
-            return ThreeStateOptional.of((T) object);
+            return ThreeStateOptional.of((T) returned);
         }
 
         Object get0(Object object)
