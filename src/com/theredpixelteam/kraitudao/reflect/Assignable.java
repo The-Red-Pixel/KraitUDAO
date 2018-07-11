@@ -1,9 +1,9 @@
 package com.theredpixelteam.kraitudao.reflect;
 
 public interface Assignable {
-    public Object get(Object object);
+    public Object get(Object object) throws Exception;
 
-    public boolean set(Object object, Object value);
+    public void set(Object object, Object value) throws Exception;
 
     public Class<?> getType();
 

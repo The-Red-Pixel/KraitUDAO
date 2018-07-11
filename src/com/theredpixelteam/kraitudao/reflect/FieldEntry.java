@@ -12,4 +12,6 @@ public @interface FieldEntry {
     public String name();
 
     public Class<?> type() default PlaceHolder.class;
+
+    public Class<?> owner() default PlaceHolder.class;
 }

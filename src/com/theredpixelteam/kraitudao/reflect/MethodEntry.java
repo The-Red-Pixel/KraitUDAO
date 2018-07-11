@@ -13,6 +13,8 @@ public @interface MethodEntry {
 
     public Class<?> returnType() default PlaceHolder.class;
 
+    public Class<?> fieldType() default PlaceHolder.class;
+
     public String field() default "";
 
     public String method();
