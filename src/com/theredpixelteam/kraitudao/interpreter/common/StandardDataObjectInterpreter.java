@@ -35,6 +35,7 @@ import com.theredpixelteam.kraitudao.annotations.metadata.common.ValueList;
 import com.theredpixelteam.kraitudao.annotations.metadata.common.ValueMap;
 import com.theredpixelteam.kraitudao.annotations.metadata.common.ValueSet;
 import com.theredpixelteam.kraitudao.dataobject.*;
+import com.theredpixelteam.kraitudao.interpreter.DataObjectExpander;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectMalformationException;
@@ -1348,6 +1349,11 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             return get0(object);
         }
 
+        static void throwIncapableObject(Object object, Class<?> expected) throws DataObjectException
+        {
+            throw new DataObjectException("Incapable object: Type of " + object.getClass().getCanonicalName() + "(" + expected.getCanonicalName() + " expected)");
+        }
+
         @Override
         public <T> ThreeStateOptional<T> get(Object object, Class<T> type)
         {
@@ -1355,17 +1361,17 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             Objects.requireNonNull(type, "type");
 
             if(!this.ownerType.isInstance(object))
-                return ThreeStateOptional.empty();
+                throwIncapableObject(object, this.ownerType);
 
             Object returned = get(object);
 
             if(returned == null)
-                return null;
+                return ThreeStateOptional.ofNull();
 
             if(!(type.isInstance(object)))
-                throw new DataObjectError(DataObjectException.IncapableType(returned.getClass(), type));
+                return ThreeStateOptional.empty();
 
-            return ThreeStateOptional.ofNullable((T) object);
+            return ThreeStateOptional.of((T) object);
         }
 
         Object get0(Object object)
@@ -1394,10 +1400,10 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             Objects.requireNonNull(type, "type");
 
             if(!this.ownerType.isInstance(object))
-                return false;
+                throwIncapableObject(object, this.ownerType);
 
             if(!type.isInstance(value) && (compatibleType == null || !compatibleType.isInstance(value)))
-                throw new DataObjectError(DataObjectException.IncapableValue(value, type));
+                return false;
 
             set0(object, value);
             return true;
