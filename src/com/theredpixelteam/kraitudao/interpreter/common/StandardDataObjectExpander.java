@@ -4,11 +4,11 @@ import com.theredpixelteam.kraitudao.dataobject.*;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectExpander;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectMalformationException;
+import com.theredpixelteam.redtea.util.Optional;
 
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 
 public class StandardDataObjectExpander implements DataObjectExpander {
     @Override

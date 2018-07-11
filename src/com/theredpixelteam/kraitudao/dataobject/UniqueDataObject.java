@@ -21,7 +21,7 @@
 
 package com.theredpixelteam.kraitudao.dataobject;
 
-import java.util.Optional;
+import com.theredpixelteam.redtea.util.Optional;
 
 public interface UniqueDataObject extends DataObject {
     public ValueObject getKey();

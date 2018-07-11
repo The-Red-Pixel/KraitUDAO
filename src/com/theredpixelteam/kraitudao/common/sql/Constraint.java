@@ -1,7 +1,8 @@
 package com.theredpixelteam.kraitudao.common.sql;
 
+import com.theredpixelteam.redtea.util.Optional;
+
 import java.util.Objects;
-import java.util.Optional;
 
 public class Constraint {
     protected Constraint(ConstraintType constraint, String[] targets, Reference reference, String expression)

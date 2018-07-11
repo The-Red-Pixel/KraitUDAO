@@ -21,8 +21,9 @@
 
 package com.theredpixelteam.kraitudao.dataobject;
 
+import com.theredpixelteam.redtea.util.Optional;
+
 import java.util.Map;
-import java.util.Optional;
 
 public interface MultipleDataObject extends DataObject {
     public ValueObject getPrimaryKey();

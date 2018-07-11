@@ -1,6 +1,6 @@
 package com.theredpixelteam.kraitudao.annotations.metadata.common;
 
-import com.theredpixelteam.kraitudao.annotations.location.MethodEntry;
+import com.theredpixelteam.kraitudao.reflect.MethodEntry;
 import com.theredpixelteam.kraitudao.annotations.metadata.ExpandedName;
 import com.theredpixelteam.kraitudao.annotations.metadata.Metadata;
 import com.theredpixelteam.kraitudao.annotations.metadata.MetadataCollection;

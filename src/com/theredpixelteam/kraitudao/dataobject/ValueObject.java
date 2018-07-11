@@ -22,8 +22,8 @@
 package com.theredpixelteam.kraitudao.dataobject;
 
 import com.theredpixelteam.kraitudao.ObjectConstructor;
-
-import java.util.Optional;
+import com.theredpixelteam.redtea.util.Optional;
+import com.theredpixelteam.redtea.util.ThreeStateOptional;
 
 public interface ValueObject extends Metadatable {
     public String getName();
@@ -32,11 +32,11 @@ public interface ValueObject extends Metadatable {
 
     public Object get(Object object);
 
-    public <T> T get(Object object, Class<T> type);
+    public <T> ThreeStateOptional<T> get(Object object, Class<T> type);
 
     public void set(Object object, Object value);
 
-    public <T> void set(Object object, T value, Class<T> type);
+    public <T> boolean set(Object object, T value, Class<T> type);
 
     public Class<?> getOwnerType();
 

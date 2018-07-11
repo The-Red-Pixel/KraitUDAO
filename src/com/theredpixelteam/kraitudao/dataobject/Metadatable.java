@@ -21,9 +21,10 @@
 
 package com.theredpixelteam.kraitudao.dataobject;
 
+import com.theredpixelteam.redtea.util.Optional;
+
 import java.lang.annotation.Annotation;
 import java.util.Map;
-import java.util.Optional;
 
 public interface Metadatable {
     public <T extends Annotation> Optional<T> getMetadata(Class<T> type);

@@ -21,7 +21,7 @@
 
 package com.theredpixelteam.kraitudao.common.sql;
 
-import java.util.Optional;
+import com.theredpixelteam.redtea.util.Optional;
 
 public interface DataExtractorFactory {
     public Optional<DataExtractor> create(Class<?> type, String columnName);

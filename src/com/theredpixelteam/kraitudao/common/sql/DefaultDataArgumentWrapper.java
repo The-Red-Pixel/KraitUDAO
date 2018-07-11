@@ -22,6 +22,7 @@
 package com.theredpixelteam.kraitudao.common.sql;
 
 import com.theredpixelteam.kraitudao.misc.Misc;
+import com.theredpixelteam.redtea.util.Optional;
 
 import java.io.InputStream;
 import java.io.Reader;
@@ -30,7 +31,6 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 
 public class DefaultDataArgumentWrapper implements DataArgumentWrapper {
     @Override

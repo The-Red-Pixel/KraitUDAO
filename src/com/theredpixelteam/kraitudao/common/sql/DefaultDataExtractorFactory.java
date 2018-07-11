@@ -23,6 +23,7 @@ package com.theredpixelteam.kraitudao.common.sql;
 
 import com.theredpixelteam.kraitudao.DataSourceError;
 import com.theredpixelteam.kraitudao.misc.Misc;
+import com.theredpixelteam.redtea.util.Optional;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -32,7 +33,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 
 public class DefaultDataExtractorFactory implements DataExtractorFactory {
     @Override

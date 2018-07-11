@@ -1,4 +1,4 @@
-package com.theredpixelteam.kraitudao.annotations.location;
+package com.theredpixelteam.kraitudao.reflect;
 
 import com.theredpixelteam.kraitudao.PlaceHolder;
 

@@ -25,9 +25,9 @@ import com.theredpixelteam.kraitudao.DataSource;
 import com.theredpixelteam.kraitudao.DataSourceException;
 import com.theredpixelteam.kraitudao.ObjectConstructor;
 import com.theredpixelteam.kraitudao.Transaction;
+import com.theredpixelteam.redtea.util.Optional;
 
 import java.util.Collection;
-import java.util.Optional;
 
 public final class DataSourceUtil {
     private DataSourceUtil()

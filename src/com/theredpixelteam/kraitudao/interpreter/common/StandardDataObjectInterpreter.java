@@ -29,7 +29,11 @@ import com.theredpixelteam.kraitudao.annotations.inheritance.*;
 import com.theredpixelteam.kraitudao.annotations.metadata.ExpandedName;
 import com.theredpixelteam.kraitudao.annotations.metadata.Metadata;
 import com.theredpixelteam.kraitudao.annotations.metadata.MetadataCollection;
+import com.theredpixelteam.kraitudao.annotations.metadata.common.Constructor;
 import com.theredpixelteam.kraitudao.annotations.metadata.common.IgnoreWhenEquals;
+import com.theredpixelteam.kraitudao.annotations.metadata.common.ValueList;
+import com.theredpixelteam.kraitudao.annotations.metadata.common.ValueMap;
+import com.theredpixelteam.kraitudao.annotations.metadata.common.ValueSet;
 import com.theredpixelteam.kraitudao.dataobject.*;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
@@ -38,6 +42,8 @@ import com.theredpixelteam.redtea.predication.MultiCondition;
 import com.theredpixelteam.redtea.predication.MultiPredicate;
 import com.theredpixelteam.redtea.predication.NamedPredicate;
 import com.theredpixelteam.redtea.util.Reference;
+import com.theredpixelteam.redtea.util.Optional;
+import com.theredpixelteam.redtea.util.ThreeStateOptional;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
@@ -585,6 +591,8 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
                 }
             }
 
+            parseMetadata(valueObject);
+
             if(top)
                 valueObject.seal();
 
@@ -592,6 +600,43 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
                 container.putKey(keyType.get(), valueObject);
             else
                 container.putValue(valueObject);
+        }
+    }
+
+    private static void parseMetadata(ValueObjectContainer valueObject) throws DataObjectInterpretationException
+    {
+        Optional<Constructor> optionalConstructor = valueObject.getMetadata(Constructor.class);
+        if(optionalConstructor.isPresent())
+        {
+            Constructor constructor = optionalConstructor.get();
+        }
+
+        int i = (valueObject.hasMetadata(ValueList.class) ? 0b001 : 0)
+                | (valueObject.hasMetadata(ValueMap.class) ? 0b010 : 0)
+                | (valueObject.hasMetadata(ValueSet.class) ? 0b100 : 0);
+
+        switch(i)
+        {
+            case 0b000:
+                return;
+
+            case 0b001: // ValueList
+
+                break;
+
+            case 0b010: // ValueMap
+
+                break;
+
+            case 0b100: // ValueSet
+
+                break;
+
+            case 0b011:
+            case 0b101:
+            case 0b110:
+            case 0b111: // duplicated
+                throw new DataObjectMalformationException("Duplicated @ValueList/@ValueMap/@ValueSet metadata");
         }
     }
 
@@ -920,7 +965,6 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
     {
         return NamedPredicate.of(annotation, (t) -> t.getAnnotation(annotation) != null);
     }
-
     private final Map<Class<?>, ExpandRule> bulitInRules;
 
     public static final StandardDataObjectInterpreter INSTANCE = new StandardDataObjectInterpreter();
@@ -1305,13 +1349,13 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         }
 
         @Override
-        public <T> T get(Object object, Class<T> type)
+        public <T> ThreeStateOptional<T> get(Object object, Class<T> type)
         {
             Objects.requireNonNull(object, "object");
             Objects.requireNonNull(type, "type");
 
             if(!this.ownerType.isInstance(object))
-                throw DataObjectException.IncapableObject(object, this.ownerType);
+                return ThreeStateOptional.empty();
 
             Object returned = get(object);
 
@@ -1321,7 +1365,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             if(!(type.isInstance(object)))
                 throw new DataObjectError(DataObjectException.IncapableType(returned.getClass(), type));
 
-            return (T) object;
+            return ThreeStateOptional.ofNullable((T) object);
         }
 
         Object get0(Object object)
@@ -1344,18 +1388,19 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         }
 
         @Override
-        public <T> void set(Object object, T value, Class<T> type)
+        public <T> boolean set(Object object, T value, Class<T> type)
         {
             Objects.requireNonNull(object, "object");
             Objects.requireNonNull(type, "type");
 
             if(!this.ownerType.isInstance(object))
-                throw DataObjectException.IncapableObject(object, this.ownerType);
+                return false;
 
             if(!type.isInstance(value) && (compatibleType == null || !compatibleType.isInstance(value)))
-                throw DataObjectException.IncapableValue(value, type);
+                throw new DataObjectError(DataObjectException.IncapableValue(value, type));
 
             set0(object, value);
+            return true;
         }
 
         void set0(Object object, Object value)

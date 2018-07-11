@@ -27,12 +27,10 @@ import com.theredpixelteam.kraitudao.dataobject.DataObjectError;
 import com.theredpixelteam.kraitudao.dataobject.ValueObject;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectExpander;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
+import com.theredpixelteam.redtea.util.Optional;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class DataObjectCache implements DataObjectContainer {
     public DataObjectCache()

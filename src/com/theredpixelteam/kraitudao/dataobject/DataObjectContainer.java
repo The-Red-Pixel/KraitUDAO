@@ -24,9 +24,9 @@ package com.theredpixelteam.kraitudao.dataobject;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectExpander;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
+import com.theredpixelteam.redtea.util.Optional;
 
 import java.util.Map;
-import java.util.Optional;
 
 public interface DataObjectContainer {
     public Optional<DataObject> get(Class<?> type);

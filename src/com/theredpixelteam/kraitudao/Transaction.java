@@ -21,7 +21,7 @@
 
 package com.theredpixelteam.kraitudao;
 
-import java.util.Optional;
+import com.theredpixelteam.redtea.util.Optional;
 
 public interface Transaction {
     public boolean push() throws DataSourceException;
