@@ -21,6 +21,8 @@
 
 package com.theredpixelteam.kraitudao;
 
+import com.theredpixelteam.redtea.function.SupplierWithThrowable;
+
 import java.util.Collection;
 
 @SuppressWarnings("unchecked")
@@ -36,12 +38,12 @@ public interface DataSource {
 
     public default <T> Collection<T> pull(Class<T> type) throws DataSourceException
     {
-        return pull(type, ObjectConstructor.of(type, type::newInstance));
+        return pull(type, type::newInstance);
     }
 
-    public <T> Collection<T> pull(Class<T> type, ObjectConstructor<T> constructor) throws DataSourceException;
+    public <T, X extends Throwable> Collection<T> pull(Class<T> type, SupplierWithThrowable<T, X> constructor) throws DataSourceException;
 
-    public <T> Collection<T> pull(Class<T> type, ObjectConstructor<T> constructor, Class<?>... signatured) throws DataSourceException;
+    public <T, X extends Throwable> Collection<T> pull(Class<T> type, SupplierWithThrowable<T, X> constructor, Class<?>... signatured) throws DataSourceException;
 
     public default <T> Collection<T> pullVaguely(T object) throws DataSourceException
     {
@@ -50,10 +52,10 @@ public interface DataSource {
 
     public default <T> Collection<T> pullVaguely(T object, Class<T> type) throws DataSourceException
     {
-        return pullVaguely(object, type, ObjectConstructor.of(type, type::newInstance));
+        return pullVaguely(object, type, type::newInstance);
     }
 
-    public <T> Collection<T> pullVaguely(T object, Class<T> type, ObjectConstructor<T> constructor) throws DataSourceException;
+    public <T, X extends Throwable> Collection<T> pullVaguely(T object, Class<T> type, SupplierWithThrowable<T, X> constructor) throws DataSourceException;
 
     public default <T> Transaction commit(T object) throws DataSourceException
     {

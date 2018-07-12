@@ -23,8 +23,8 @@ package com.theredpixelteam.kraitudao.common;
 
 import com.theredpixelteam.kraitudao.DataSource;
 import com.theredpixelteam.kraitudao.DataSourceException;
-import com.theredpixelteam.kraitudao.ObjectConstructor;
 import com.theredpixelteam.kraitudao.Transaction;
+import com.theredpixelteam.redtea.function.SupplierWithThrowable;
 import com.theredpixelteam.redtea.util.Optional;
 
 import java.util.Collection;
@@ -71,14 +71,14 @@ public final class DataSourceUtil {
         }
 
         @Override
-        public synchronized <T> Collection<T> pull(Class<T> type, ObjectConstructor<T> constructor)
+        public synchronized <T, X extends Throwable> Collection<T> pull(Class<T> type, SupplierWithThrowable<T, X> constructor)
                 throws DataSourceException
         {
             return this.object.pull(type, constructor);
         }
 
         @Override
-        public synchronized <T> Collection<T> pull(Class<T> type, ObjectConstructor<T> constructor, Class<?>... signatured)
+        public synchronized <T, X extends Throwable> Collection<T> pull(Class<T> type, SupplierWithThrowable<T, X> constructor, Class<?>... signatured)
                 throws DataSourceException
         {
             return this.object.pull(type, constructor, signatured);
@@ -94,11 +94,11 @@ public final class DataSourceUtil {
         @Override
         public synchronized <T> Collection<T> pullVaguely(T object, Class<T> type) throws DataSourceException
         {
-            return this.pullVaguely(object, type);
+            return this.object.pullVaguely(object, type);
         }
 
         @Override
-        public synchronized <T> Collection<T> pullVaguely(T object, Class<T> type, ObjectConstructor<T> constructor)
+        public synchronized <T, X extends Throwable> Collection<T> pullVaguely(T object, Class<T> type, SupplierWithThrowable<T, X> constructor)
                 throws DataSourceException
         {
             return this.object.pullVaguely(object, type, constructor);

@@ -1,11 +1,13 @@
 package com.theredpixelteam.kraitudao.reflect;
 
-public interface Callable {
-    public Object call(Object object, Object... arguments) throws Exception;
+import com.theredpixelteam.redtea.util.Optional;
+
+public interface Callable<T> {
+    public T call(Object object, Object... arguments) throws Exception;
 
     public String getName();
 
-    public Class<?> getReturnType();
+    public Class<T> getReturnType();
 
     public Class<?>[] getArguments();
 
@@ -14,5 +16,13 @@ public interface Callable {
     public default int getArgumentCount()
     {
         return getArguments().length;
+    }
+
+    @SuppressWarnings("unchecked")
+    public default <R> Optional<Callable<R>> as(Class<T> returnType)
+    {
+        if(returnType.isAssignableFrom(getReturnType()))
+            return Optional.of((Callable<R>) this);
+        return Optional.empty();
     }
 }

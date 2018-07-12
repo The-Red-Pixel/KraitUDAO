@@ -23,7 +23,6 @@ package com.theredpixelteam.kraitudao.common;
 
 import com.theredpixelteam.kraitudao.DataSource;
 import com.theredpixelteam.kraitudao.DataSourceException;
-import com.theredpixelteam.kraitudao.ObjectConstructor;
 import com.theredpixelteam.kraitudao.Transaction;
 import com.theredpixelteam.kraitudao.annotations.metadata.common.ExpandForcibly;
 import com.theredpixelteam.kraitudao.annotations.metadata.common.NotNull;
@@ -35,6 +34,7 @@ import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationExcepti
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
 import com.theredpixelteam.kraitudao.interpreter.common.StandardDataObjectExpander;
 import com.theredpixelteam.kraitudao.interpreter.common.StandardDataObjectInterpreter;
+import com.theredpixelteam.redtea.function.SupplierWithThrowable;
 import com.theredpixelteam.redtea.util.Pair;
 import com.theredpixelteam.redtea.util.Vector3;
 import com.theredpixelteam.redtea.util.concurrent.Increment;
@@ -166,20 +166,20 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     }
 
     @Override
-    public <T> Collection<T> pull(Class<T> type, ObjectConstructor<T> constructor) throws DataSourceException
+    public <T, X extends Throwable> Collection<T> pull(Class<T> type, SupplierWithThrowable<T, X> constructor) throws DataSourceException
     {
         return null;
     }
 
     @Override
-    public <T> Collection<T> pull(Class<T> type, ObjectConstructor<T> constructor, Class<?>... signatured)
+    public <T, X extends Throwable> Collection<T> pull(Class<T> type, SupplierWithThrowable<T, X> constructor, Class<?>... signatured)
             throws DataSourceException
     {
         return null;
     }
 
     @Override
-    public <T> Collection<T> pullVaguely(T object, Class<T> type, ObjectConstructor<T> constructor)
+    public <T, X extends Throwable> Collection<T> pullVaguely(T object, Class<T> type, SupplierWithThrowable<T, X> constructor)
             throws DataSourceException
     {
         return null;

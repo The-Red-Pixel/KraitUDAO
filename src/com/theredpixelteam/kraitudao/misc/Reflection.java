@@ -9,12 +9,13 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 
+@SuppressWarnings("unchecked")
 public class Reflection {
     private Reflection()
     {
     }
 
-    public static Optional<Callable> of(Class<?> source, MethodEntry metadata)
+    public static Optional<Callable<?>> of(Class<?> source, MethodEntry metadata)
     {
         Field field = null;
         Class<?> methodSource = null;
@@ -95,7 +96,7 @@ public class Reflection {
                     if (returnType != PlaceHolder.class && returnType != method.getReturnType())
                         return Optional.empty();
 
-                    return Optional.of(new CallableImpl(
+                    return Optional.of(new CallableImpl<>(
                             method,
                             objectGetter,
                             !(metadata.source().equals(MethodSource.THIS) || metadata.source().equals(MethodSource.FIELD))
@@ -109,7 +110,7 @@ public class Reflection {
         }
     }
 
-    public static Optional<Assignable> of(Class<?> source, FieldEntry metadata)
+    public static Optional<Assignable<?>> of(Class<?> source, FieldEntry metadata)
     {
         boolean requireStatic = false;
 
@@ -157,7 +158,7 @@ public class Reflection {
         }
     }
 
-    private static class AssignableImpl implements Assignable
+    private static class AssignableImpl<T> implements Assignable<T>
     {
         private AssignableImpl(Field field)
         {
@@ -165,21 +166,21 @@ public class Reflection {
         }
 
         @Override
-        public Object get(Object object) throws Exception
+        public T get(Object object) throws Exception
         {
-            return field.get(object);
+            return (T) field.get(object);
         }
 
         @Override
-        public void set(Object object, Object value) throws Exception
+        public void set(Object object, T value) throws Exception
         {
             field.set(object, value);
         }
 
         @Override
-        public Class<?> getType()
+        public Class<T> getType()
         {
-            return field.getType();
+            return (Class<T>) field.getType();
         }
 
         @Override
@@ -191,7 +192,7 @@ public class Reflection {
         private final Field field;
     }
 
-    private static class CallableImpl implements Callable
+    private static class CallableImpl<T> implements Callable<T>
     {
         private CallableImpl(Method method, FunctionWithThrowable<Object, Object, Exception> objectGetter, boolean isStatic)
         {
@@ -201,9 +202,9 @@ public class Reflection {
         }
 
         @Override
-        public Object call(Object object, Object... arguments) throws Exception
+        public T call(Object object, Object... arguments) throws Exception
         {
-            return method.invoke(objectGetter.apply(object), arguments);
+            return (T) method.invoke(objectGetter.apply(object), arguments);
         }
 
         @Override
@@ -213,9 +214,9 @@ public class Reflection {
         }
 
         @Override
-        public Class<?> getReturnType()
+        public Class<T> getReturnType()
         {
-            return method.getReturnType();
+            return (Class<T>) method.getReturnType();
         }
 
         @Override

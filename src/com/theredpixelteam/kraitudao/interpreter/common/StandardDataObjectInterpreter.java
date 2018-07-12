@@ -35,10 +35,13 @@ import com.theredpixelteam.kraitudao.annotations.metadata.common.ValueList;
 import com.theredpixelteam.kraitudao.annotations.metadata.common.ValueMap;
 import com.theredpixelteam.kraitudao.annotations.metadata.common.ValueSet;
 import com.theredpixelteam.kraitudao.dataobject.*;
-import com.theredpixelteam.kraitudao.interpreter.DataObjectExpander;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectMalformationException;
+import com.theredpixelteam.kraitudao.misc.Misc;
+import com.theredpixelteam.kraitudao.misc.Reflection;
+import com.theredpixelteam.kraitudao.reflect.Callable;
+import com.theredpixelteam.kraitudao.reflect.MethodEntry;
 import com.theredpixelteam.redtea.predication.MultiCondition;
 import com.theredpixelteam.redtea.predication.MultiPredicate;
 import com.theredpixelteam.redtea.predication.NamedPredicate;
@@ -604,13 +607,24 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         }
     }
 
-    private static void parseMetadata(ValueObjectContainer valueObject) throws DataObjectInterpretationException
+    private static <T> void parseMetadata(ValueObjectContainer valueObject) throws DataObjectInterpretationException
     {
-        Optional<Constructor> optionalConstructor = valueObject.getMetadata(Constructor.class);
-        if(optionalConstructor.isPresent())
-        {
-            Constructor constructor = optionalConstructor.get();
-        }
+        valueObject.getMetadata(Constructor.class).ifPresent((constructor) -> {
+            MethodEntry constructorEntry = constructor.value();
+
+            if(constructorEntry.arguments().length != 0)
+                throw new DataObjectMalformationException("Arguments not allowed in method entry of @Constructor");
+
+            Callable callable = Reflection.of(valueObject.getOwnerType(), constructorEntry)
+                    .orElseThrow(() ->
+                            new DataObjectMalformationException("No such method: " + Misc.toString(valueObject.getOwnerType(), constructorEntry)));
+
+            ((Callable<T>) callable).as((Class<T>) valueObject.type)
+                    .orElseThrow(() -> // really awful, I don't know why the <X extends Throwable> signature just gets lost when using rawtype of Optional
+                            new DataObjectMalformationException("Illegal return type of constructor (Name: " + valueObject.getName() + ")"));
+
+            valueObject.objectConstructor = ObjectConstructor.of(callable.getReturnType(), (obj) -> callable.call(obj));
+        });
 
         int i = (valueObject.hasMetadata(ValueList.class) ? 0b001 : 0)
                 | (valueObject.hasMetadata(ValueMap.class) ? 0b010 : 0)
@@ -618,8 +632,8 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
 
         switch(i)
         {
-            case 0b000:
-                return;
+            case 0b000: // none
+                break;
 
             case 0b001: // ValueList
 
