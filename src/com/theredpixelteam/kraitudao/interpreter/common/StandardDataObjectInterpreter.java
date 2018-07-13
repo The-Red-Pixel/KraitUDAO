@@ -636,15 +636,15 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
                 break;
 
             case 0b001: // ValueList
-
+                valueObject.structureType = StructureType.LIST;
                 break;
 
             case 0b010: // ValueMap
-
+                valueObject.structureType = StructureType.MAP;
                 break;
 
             case 0b100: // ValueSet
-
+                valueObject.structureType = StructureType.SET;
                 break;
 
             case 0b011:
@@ -1335,6 +1335,9 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             if(setter == null)
                 throw new DataObjectMalformationException("null setter");
 
+            if(structureType == null)
+                throw new DataObjectMalformationException("null structure type");
+
             if(primaryKey && expandRule != null)
                 throw new DataObjectMalformationException("Expansion not allowed on primary keys (Name: " + name + ")");
 
@@ -1347,6 +1350,12 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         public String getName()
         {
             return this.name;
+        }
+
+        @Override
+        public StructureType getStructure()
+        {
+            return this.structureType;
         }
 
         @Override
@@ -1477,6 +1486,8 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         }
 
         final Class<?> ownerType;
+
+        StructureType structureType = StructureType.VALUE;
 
         String name;
 

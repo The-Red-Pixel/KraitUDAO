@@ -28,6 +28,8 @@ import com.theredpixelteam.redtea.util.ThreeStateOptional;
 public interface ValueObject extends Metadatable {
     public String getName();
 
+    public StructureType getStructure();
+
     public Class<?> getType();
 
     public Object get(Object object);
