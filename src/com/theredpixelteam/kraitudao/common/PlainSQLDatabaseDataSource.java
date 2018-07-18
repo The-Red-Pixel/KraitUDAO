@@ -126,10 +126,32 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             throw new DataSourceException.Busy();
     }
 
-    private void extract(ResultSet resultSet, Object object, ValueObject valueObject, Class<?>[] signatured, Increment signaturePointer)
+    private void extract(ResultSet resultSet, Object object, ValueObject valueObject, String tableName, Class<?>[] signatured, Increment signaturePointer)
             throws DataSourceException
     {
         Class<?> dataType = valueObject.getType();
+
+        switch (valueObject.getStructure())
+        {
+            case VALUE:
+
+                break;
+
+            case MAP:
+
+                break;
+
+            case SET:
+
+                break;
+
+            case LIST:
+
+                break;
+
+            default:
+                throw new Error("Should not reach here");
+        }
     }
 
     @Override
@@ -145,7 +167,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
                 try (ResultSet resultSet = manipulator.query(connection, tableName, null, values)) {
                     for (ValueObject valueObject : dataObject.getValues().values())
-                        extract(resultSet, object, valueObject, null, null);
+                        extract(resultSet, object, valueObject, this.tableName, null, null);
                 } catch (SQLException e) {
                     throw new DataSourceException("SQLException", e);
                 }
