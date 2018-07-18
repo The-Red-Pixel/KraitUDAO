@@ -53,4 +53,9 @@ public interface ObjectConstructor<T> {
             }
         };
     }
+
+    public static <T> ObjectConstructor<T> ofDefault(Class<T> type)
+    {
+        return of(type, (obj) -> type.newInstance());
+    }
 }

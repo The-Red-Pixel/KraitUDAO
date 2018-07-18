@@ -23,6 +23,7 @@ package com.theredpixelteam.kraitudao.common;
 
 import com.theredpixelteam.kraitudao.DataSource;
 import com.theredpixelteam.kraitudao.DataSourceException;
+import com.theredpixelteam.kraitudao.ObjectConstructor;
 import com.theredpixelteam.kraitudao.Transaction;
 import com.theredpixelteam.kraitudao.annotations.metadata.common.ExpandForcibly;
 import com.theredpixelteam.kraitudao.annotations.metadata.common.NotNull;
@@ -32,6 +33,7 @@ import com.theredpixelteam.kraitudao.dataobject.util.ValueObjectIterator;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectExpander;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationException;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
+import com.theredpixelteam.kraitudao.interpreter.DataObjectMalformationException;
 import com.theredpixelteam.kraitudao.interpreter.common.StandardDataObjectExpander;
 import com.theredpixelteam.kraitudao.interpreter.common.StandardDataObjectInterpreter;
 import com.theredpixelteam.redtea.function.SupplierWithThrowable;
@@ -45,6 +47,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
 
+@SuppressWarnings("unchecked")
 public class PlainSQLDatabaseDataSource implements DataSource {
     public PlainSQLDatabaseDataSource(Connection connection,
                                       String tableName,
@@ -129,12 +132,10 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     private void extract(ResultSet resultSet, Object object, ValueObject valueObject, String tableName, Class<?>[] signatured, Increment signaturePointer)
             throws DataSourceException
     {
-        Class<?> dataType = valueObject.getType();
-
         switch (valueObject.getStructure())
         {
             case VALUE:
-
+                extractValue(resultSet, object, valueObject);
                 break;
 
             case MAP:
@@ -151,6 +152,32 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
             default:
                 throw new Error("Should not reach here");
+        }
+    }
+
+    private <T> void extractValue(ResultSet resultSet, Object object, ValueObject valueObject) throws DataSourceException
+    {
+        Class<T> dataType = (Class<T>) valueObject.getType();
+
+        EXPANDABLE_OBJECT_CONSTRUCTION:
+        if (valueObject.hasMetadata(ExpandForcibly.class) || !manipulator.supportType(dataType))
+        {
+            if (valueObject.get(object) != null)
+                break EXPANDABLE_OBJECT_CONSTRUCTION;
+
+            ObjectConstructor<T> objectConstructor = valueObject.getConstructor(dataType)
+                    .throwIfEmpty(
+                            () -> new DataSourceException(
+                                    new DataObjectMalformationException("Bad constructor type of value object \"" + valueObject.getName() + "\"")))
+                    .getWhenNull(() -> ObjectConstructor.ofDefault(dataType));
+
+            try {
+                T constructed = objectConstructor.newInstance(object);
+
+                valueObject.set(object, constructed);
+            } catch (Exception e) {
+                throw new DataSourceException("Construction failure", e);
+            }
         }
     }
 

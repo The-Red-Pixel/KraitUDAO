@@ -56,19 +56,19 @@ public interface ValueObject extends Metadatable {
     public Optional<ExpandRule> getExpandRule();
 
     @SuppressWarnings("unchecked")
-    public default <T> Optional<ObjectConstructor<T>> getConstructor(Class<T> type)
+    public default <T> ThreeStateOptional<ObjectConstructor<T>> getConstructor(Class<T> type)
     {
         Optional<ObjectConstructor<?>> optional = getConstructor();
 
         if(!optional.isPresent())
-            return Optional.empty();
+            return ThreeStateOptional.empty();
 
         ObjectConstructor<?> constructor = optional.get();
 
         if(!type.isAssignableFrom(constructor.getType()))
-            return Optional.empty();
+            return ThreeStateOptional.ofNull();
 
-        return Optional.of((ObjectConstructor<T>) constructor);
+        return ThreeStateOptional.of((ObjectConstructor<T>) constructor);
     }
 
     public Optional<ObjectConstructor<?>> getConstructor();
