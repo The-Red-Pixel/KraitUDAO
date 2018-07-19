@@ -26,8 +26,7 @@ import com.theredpixelteam.kraitudao.DataSourceException;
 import com.theredpixelteam.kraitudao.ObjectConstructor;
 import com.theredpixelteam.kraitudao.Transaction;
 import com.theredpixelteam.kraitudao.annotations.Element;
-import com.theredpixelteam.kraitudao.annotations.metadata.common.ExpandForcibly;
-import com.theredpixelteam.kraitudao.annotations.metadata.common.NotNull;
+import com.theredpixelteam.kraitudao.annotations.metadata.common.*;
 import com.theredpixelteam.kraitudao.common.sql.*;
 import com.theredpixelteam.kraitudao.dataobject.*;
 import com.theredpixelteam.kraitudao.dataobject.util.ValueObjectIterator;
@@ -130,9 +129,10 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             throw new DataSourceException.Busy();
     }
 
-    private void extract(ResultSet resultSet, Object object, ValueObject valueObject, String tableName, Class<?>[] signatured, Increment signaturePointer)
+    private void extract(ResultSet resultSet, Object object, ValueObject valueObject, StringBuilder prefix, Class<?>[] signature, Increment signaturePointer)
             throws DataSourceException
     {
+        Class<?> dataType;
         switch (valueObject.getStructure())
         {
             case VALUE:
@@ -140,20 +140,83 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                 break;
 
             case MAP:
+                if (signature == null)
+                {
+                    ValueMap valueMap = valueObject.getMetadata(ValueMap.class)
+                            .orElseThrow(() -> new DataSourceException(
+                                    new DataObjectMalformationException("Missing metadata @ValueMap (Name: " + valueObject.getName() + ")")));
+                    dataType = valueObject.getType();
 
+                    if (!dataType.isAssignableFrom(valueMap.type()))
+                        throw new DataSourceException(
+                                new DataObjectMalformationException("Illegal type in @ValueMap (Name: " + valueObject.getName() + ")"));
+
+                    signature = valueMap.signatured();
+                    signaturePointer = new Increment();
+                }
+
+                extractMap(resultSet, object, valueObject, prefix, signature, signaturePointer);
                 break;
 
             case SET:
+                if (signature == null)
+                {
+                    ValueSet valueSet = valueObject.getMetadata(ValueSet.class)
+                            .orElseThrow(() -> new DataSourceException(
+                                    new DataObjectMalformationException("Missing metadata @ValueSet (Name: " + valueObject.getName() + ")")));
+                    dataType = valueObject.getType();
 
+                    if (!dataType.isAssignableFrom(valueSet.type()))
+                        throw new DataSourceException(
+                                new DataObjectMalformationException("Illegal type in @ValueSet (Name: " + valueObject.getName() + ")"));
+
+                    signature = valueSet.signatured();
+                    signaturePointer = new Increment();
+                }
+
+                extractSet(resultSet, object, valueObject, prefix, signature, signaturePointer);
                 break;
 
             case LIST:
+                if (signature == null)
+                {
+                    ValueList valueList = valueObject.getMetadata(ValueList.class)
+                            .orElseThrow(() -> new DataSourceException(
+                                    new DataObjectMalformationException("Missing metadata @ValueList (Name: " + valueObject.getName() + ")")));
+                    dataType = valueObject.getType();
 
+                    if (!dataType.isAssignableFrom(valueList.type()))
+                        throw new DataSourceException(
+                                new DataObjectMalformationException("Illegal type in @ValueList (Name: " + valueObject.getName() + ")"));
+
+                    signature = valueList.signatured();
+                    signaturePointer = new Increment();
+                }
+
+                extractList(resultSet, object, valueObject, prefix, signature, signaturePointer);
                 break;
 
             default:
                 throw new Error("Should not reach here");
         }
+    }
+
+    private void extractMap(ResultSet resultSet, Object object, ValueObject valueObject, StringBuilder prefix,
+                            Class<?>[] signature, Increment signaturePointer) throws DataSourceException
+    {
+
+    }
+
+    private void extractSet(ResultSet resultSet, Object object, ValueObject valueObject, StringBuilder prefix,
+                            Class<?>[] signature, Increment signaturePointer) throws DataSourceException
+    {
+
+    }
+
+    private void extractList(ResultSet resultSet, Object object, ValueObject valueObject, StringBuilder prefix,
+                             Class<?>[] signature, Increment signaturePointer) throws DataSourceException
+    {
+
     }
 
     private <T> void extractValue(ResultSet resultSet, Object object, ValueObject valueObject, StringBuilder prefix) throws DataSourceException
@@ -227,7 +290,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
                 try (ResultSet resultSet = manipulator.query(connection, tableName, null, values)) {
                     for (ValueObject valueObject : dataObject.getValues().values())
-                        extract(resultSet, object, valueObject, this.tableName, null, null);
+                        extract(resultSet, object, valueObject, new StringBuilder(), null, null);
                 } catch (SQLException e) {
                     throw new DataSourceException("SQLException", e);
                 }
