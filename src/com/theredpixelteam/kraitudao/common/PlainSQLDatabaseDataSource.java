@@ -25,6 +25,7 @@ import com.theredpixelteam.kraitudao.DataSource;
 import com.theredpixelteam.kraitudao.DataSourceException;
 import com.theredpixelteam.kraitudao.ObjectConstructor;
 import com.theredpixelteam.kraitudao.Transaction;
+import com.theredpixelteam.kraitudao.annotations.Element;
 import com.theredpixelteam.kraitudao.annotations.metadata.common.ExpandForcibly;
 import com.theredpixelteam.kraitudao.annotations.metadata.common.NotNull;
 import com.theredpixelteam.kraitudao.common.sql.*;
@@ -135,7 +136,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         switch (valueObject.getStructure())
         {
             case VALUE:
-                extractValue(resultSet, object, valueObject);
+                extractValue(resultSet, object, valueObject, new StringBuilder());
                 break;
 
             case MAP:
@@ -155,12 +156,17 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         }
     }
 
-    private <T> void extractValue(ResultSet resultSet, Object object, ValueObject valueObject) throws DataSourceException
+    private <T> void extractValue(ResultSet resultSet, Object object, ValueObject valueObject, StringBuilder prefix) throws DataSourceException
     {
         Class<T> dataType = (Class<T>) valueObject.getType();
 
+        boolean supported = manipulator.supportType(dataType);
+        boolean expandForcibly = valueObject.hasMetadata(ExpandForcibly.class);
+
+        boolean expanding = expandForcibly || !supported;
+
         EXPANDABLE_OBJECT_CONSTRUCTION:
-        if (valueObject.hasMetadata(ExpandForcibly.class) || !manipulator.supportType(dataType))
+        if (expanding)
         {
             if (valueObject.get(object) != null)
                 break EXPANDABLE_OBJECT_CONSTRUCTION;
@@ -178,6 +184,33 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             } catch (Exception e) {
                 throw new DataSourceException("Construction failure", e);
             }
+        }
+
+        boolean elementAnnotated = valueObject.getType().getAnnotation(Element.class) != null;
+
+        if (elementAnnotated) try // EXPAND_ELEMENT_VALUE_OBJECT
+        {
+            DataObject dataObject = container.interpretIfAbsent(dataType, interpreter);
+
+            if (!(dataObject instanceof ElementDataObject))
+                throw new DataSourceException.UnsupportedValueType(dataType.getCanonicalName());
+
+            ElementDataObject elementDataObject = (ElementDataObject) dataObject;
+
+            for (ValueObject elementValueObject : elementDataObject.getValues().values())
+                extractValue(resultSet, object, elementValueObject, prefix.append(valueObject.getName()).append("_"));
+        } catch (DataObjectInterpretationException e) {
+            throw new DataSourceException(e);
+        }
+        else if (expanding) try // EXPAND_EXPANDABLE_VALUE_OBJECT
+        {
+            Map<String, ValueObject> expanded = container.expand(valueObject, expander)
+                    .orElseThrow(() -> new DataSourceException.UnsupportedValueType(dataType.getCanonicalName()));
+
+            for (ValueObject expandedValueObject : expanded.values())
+                extractValue(resultSet, object, expandedValueObject, prefix.append(valueObject.getName()).append("_"));
+        } catch (DataObjectInterpretationException e) {
+            throw new DataSourceException(e);
         }
     }
 
