@@ -21,10 +21,7 @@
 
 package com.theredpixelteam.kraitudao.common;
 
-import com.theredpixelteam.kraitudao.DataSource;
-import com.theredpixelteam.kraitudao.DataSourceException;
-import com.theredpixelteam.kraitudao.ObjectConstructor;
-import com.theredpixelteam.kraitudao.Transaction;
+import com.theredpixelteam.kraitudao.*;
 import com.theredpixelteam.kraitudao.annotations.Element;
 import com.theredpixelteam.kraitudao.annotations.metadata.common.*;
 import com.theredpixelteam.kraitudao.common.sql.*;
@@ -261,7 +258,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             ElementDataObject elementDataObject = (ElementDataObject) dataObject;
 
             for (ValueObject elementValueObject : elementDataObject.getValues().values())
-                extractValue(resultSet, object, elementValueObject, prefix.append(valueObject.getName()).append("_"));
+                extract(resultSet, object, elementValueObject, prefix.append(valueObject.getName()).append("_"), null, null);
         } catch (DataObjectInterpretationException e) {
             throw new DataSourceException(e);
         }
@@ -271,8 +268,22 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                     .orElseThrow(() -> new DataSourceException.UnsupportedValueType(dataType.getCanonicalName()));
 
             for (ValueObject expandedValueObject : expanded.values())
-                extractValue(resultSet, object, expandedValueObject, prefix.append(valueObject.getName()).append("_"));
+                extract(resultSet, object, expandedValueObject, prefix.append(valueObject.getName()).append("_"), null, null);
         } catch (DataObjectInterpretationException e) {
+            throw new DataSourceException(e);
+        }
+        else try
+        {
+            DataExtractor extractor = extractorFactory.create(dataType, prefix + valueObject.getName())
+                    .orElseThrow(() -> new DataSourceException.UnsupportedValueType(dataType.getCanonicalName()));
+
+            Object value = extractor.extract(resultSet);
+
+            if (!dataType.isInstance(value))
+                throw new DataSourceError("Extraction failure (Bad type)");
+
+            valueObject.set(object, value);
+        } catch (SQLException e) {
             throw new DataSourceException(e);
         }
     }
