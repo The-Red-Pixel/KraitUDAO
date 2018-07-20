@@ -33,6 +33,7 @@ import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectMalformationException;
 import com.theredpixelteam.kraitudao.interpreter.common.StandardDataObjectExpander;
 import com.theredpixelteam.kraitudao.interpreter.common.StandardDataObjectInterpreter;
+import com.theredpixelteam.redtea.function.Supplier;
 import com.theredpixelteam.redtea.function.SupplierWithThrowable;
 import com.theredpixelteam.redtea.util.Pair;
 import com.theredpixelteam.redtea.util.Vector3;
@@ -124,6 +125,16 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         if((transaction == null && this.currentTransaction != null)
                 || (transaction != null && !transaction.equals(this.currentTransaction)))
             throw new DataSourceException.Busy();
+    }
+
+    private static Supplier<DataSourceException> typeUnsupportedByArgumentWrapper(Class<?> type)
+    {
+        return () -> new DataSourceException.UnsupportedValueType("(Caused by ArgumentWrapper) " + type.getCanonicalName());
+    }
+
+    private static Supplier<DataSourceException> typeUnsupportedByExtractor(Class<?> type)
+    {
+        return () -> new DataSourceException.UnsupportedValueType("(Caused by Extractor) " + type.getCanonicalName());
     }
 
     private void extract(ResultSet resultSet, Object object, ValueObject valueObject, StringBuilder prefix, Class<?>[] signature, Increment signaturePointer)
@@ -275,7 +286,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         else try
         {
             DataExtractor extractor = extractorFactory.create(dataType, prefix + valueObject.getName())
-                    .orElseThrow(() -> new DataSourceException.UnsupportedValueType(dataType.getCanonicalName()));
+                    .orElseThrow(typeUnsupportedByExtractor(dataType));
 
             Object value = extractor.extract(resultSet);
 
@@ -288,28 +299,62 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         }
     }
 
+    private static String[] valuesExceptKeys(DataObject dataObject)
+    {
+        Set<String> valueSet = dataObject.getValues().keySet();
+        return valueSet.toArray(new String[valueSet.size()]);
+    }
+
     @Override
     public <T> boolean pull(T object, Class<T> type) throws DataSourceException
     {
         try {
             DataObject dataObject = container.interpretIfAbsent(type, interpreter);
 
+            Pair<String, DataArgument>[] keys;
+            String[] values;
+
             if (dataObject instanceof ElementDataObject)
             {
-                Set<String> valueSet = dataObject.getValues().keySet();
-                String[] values = valueSet.toArray(new String[valueSet.size()]);
+                values = valuesExceptKeys(dataObject);
+                keys = null;
+            }
+            else if (dataObject instanceof UniqueDataObject)
+            {
+                UniqueDataObject uniqueDataObject = (UniqueDataObject) dataObject;
+                ValueObject key = uniqueDataObject.getKey();
 
-                try (ResultSet resultSet = manipulator.query(connection, tableName, null, values)) {
-                    for (ValueObject valueObject : dataObject.getValues().values())
+                Object keyValue = key.get(object);
+
+                if (keyValue == null)
+                    throw new DataSourceException("(pull) Null key in UniqueDataObject");
+
+                values = valuesExceptKeys(dataObject);
+                keys = new Pair[] {Pair.of(key.getName(), argumentWrapper.wrap(keyValue)
+                            .orElseThrow(typeUnsupportedByArgumentWrapper(key.getType())))};
+            }
+            else if (dataObject instanceof MultipleDataObject)
+            {
+                // TODO
+                keys = null;
+                values = null;
+
+
+            }
+            else
+                throw new DataSourceError("Interpretation failure");
+
+            try (ResultSet resultSet = manipulator.query(connection, tableName, keys, values)) {
+                if (!resultSet.next())
+                    return false;
+
+                for (ValueObject valueObject : dataObject.getValues().values())
                         extract(resultSet, object, valueObject, new StringBuilder(), null, null);
-                } catch (SQLException e) {
-                    throw new DataSourceException("SQLException", e);
-                }
-
-                return true;
+            } catch (SQLException e) {
+                throw new DataSourceException(e);
             }
 
-            return false;
+            return true;
         } catch (DataObjectInterpretationException e) {
             throw new DataSourceException(e);
         }
