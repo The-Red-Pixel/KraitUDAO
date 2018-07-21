@@ -259,7 +259,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
         boolean elementAnnotated = valueObject.getType().getAnnotation(Element.class) != null;
 
-        if (elementAnnotated) try // EXPAND_ELEMENT_VALUE_OBJECT
+        if (!expandForcibly && elementAnnotated) try // EXPAND_ELEMENT_VALUE_OBJECT
         {
             DataObject dataObject = container.interpretIfAbsent(dataType, interpreter);
 
@@ -327,7 +327,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                 Object keyValue = key.get(object);
 
                 if (keyValue == null)
-                    throw new DataSourceException("(pull) Null key in UniqueDataObject");
+                    throw new DataSourceException("(pull) Null key \"" + key.getName() + "\" in UniqueDataObject");
 
                 values = valuesExceptKeys(dataObject);
                 keys = new Pair[] {Pair.of(key.getName(), argumentWrapper.wrap(keyValue)
@@ -335,11 +335,33 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             }
             else if (dataObject instanceof MultipleDataObject)
             {
-                // TODO
-                keys = null;
-                values = null;
+                MultipleDataObject multipleDataObject = (MultipleDataObject) dataObject;
+                ValueObject primaryKey = multipleDataObject.getPrimaryKey();
+                Collection<ValueObject> secondaryKeys = multipleDataObject.getSecondaryKeys().values();
 
+                List<Pair<String, DataArgument>> keyList = new ArrayList<>();
 
+                Object primaryKeyValue = primaryKey.get(object);
+
+                if (primaryKeyValue == null)
+                    throw new DataSourceException("(pull) Null primary key \"" + primaryKey.getName() + "\" in MultipleDataObject");
+
+                keyList.add(Pair.of(primaryKey.getName(), argumentWrapper.wrap(primaryKeyValue)
+                        .orElseThrow(typeUnsupportedByArgumentWrapper(primaryKey.getType()))));
+
+                for (ValueObject secondaryKey : secondaryKeys)
+                {
+                    Object secondaryKeyValue = secondaryKey.get(object);
+
+                    if (secondaryKeyValue == null)
+                        throw new DataSourceException("(pull) Null secondary key \"" + secondaryKey.getName() + "\" in MultipleDataObject");
+
+                    keyList.add(Pair.of(secondaryKey.getName(), argumentWrapper.wrap(secondaryKeyValue)
+                            .orElseThrow(typeUnsupportedByArgumentWrapper(secondaryKey.getType()))));
+                }
+
+                values = valuesExceptKeys(dataObject);
+                keys = keyList.toArray(new Pair[keyList.size()]);
             }
             else
                 throw new DataSourceError("Interpretation failure");
