@@ -22,6 +22,7 @@
 package com.theredpixelteam.kraitudao.interpreter;
 
 import com.theredpixelteam.kraitudao.dataobject.*;
+import com.theredpixelteam.redtea.util.ThreeStateOptional;
 
 public interface DataObjectInterpreter {
     public default DataObject get(Object object) throws DataObjectInterpretationException
@@ -52,5 +53,5 @@ public interface DataObjectInterpreter {
 
     public ElementDataObject getElement(Class<?> type) throws DataObjectInterpretationException;
 
-
+    public ThreeStateOptional<DataObjectType> getDataObjectType(Class<?> type);
 }

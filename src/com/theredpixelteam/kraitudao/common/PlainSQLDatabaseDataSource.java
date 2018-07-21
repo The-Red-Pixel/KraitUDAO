@@ -137,6 +137,16 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         return () -> new DataSourceException.UnsupportedValueType("(Caused by Extractor) " + type.getCanonicalName());
     }
 
+    private static void checkForKeyToken(Class<?> type)
+    {
+        
+    }
+
+    private static void checkForValueToken(Class<?> type)
+    {
+
+    }
+
     private void extract(ResultSet resultSet, Object object, ValueObject valueObject, StringBuilder prefix, Class<?>[] signature, Increment signaturePointer)
             throws DataSourceException
     {

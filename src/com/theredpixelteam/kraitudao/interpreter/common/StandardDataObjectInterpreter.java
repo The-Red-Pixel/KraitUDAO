@@ -66,7 +66,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
     }
 
     @Override
-    public DataObject get(Class<?> type) throws DataObjectInterpretationException
+    public ThreeStateOptional<DataObjectType> getDataObjectType(Class<?> type)
     {
         Objects.requireNonNull(type, "type");
 
@@ -74,28 +74,52 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
                 | (type.getAnnotation(Multiple.class) == null ? 0b000 : 0b010)
                 | (type.getAnnotation(Element.class) == null ? 0b000 : 0b100);
 
-        switch(i)
+        switch (i)
         {
             case 0b000: // not annotated
-                throw new DataObjectMalformationException("Metadata annotation not found in type: " + type.getCanonicalName());
+                return ThreeStateOptional.empty();
 
             case 0b001: // only annotated by @Unique
-                return getUnique0(type);
+                return ThreeStateOptional.of(DataObjectType.UNIQUE);
 
             case 0b010: // only annotated by @Multiple
-                return getMultiple0(type);
+                return ThreeStateOptional.of(DataObjectType.MULTIPLE);
 
             case 0b100: // only annotated by @Element
-                return getElement0(type);
+                return ThreeStateOptional.of(DataObjectType.ELEMENT);
 
-            case 0b011: // both annotated
+            case 0b011: // duplicated annotation
             case 0b101:
             case 0b110:
             case 0b111:
-                throw new DataObjectMalformationException("Duplicated metadata annotation in type: " + type.getCanonicalName());
+                return ThreeStateOptional.ofNull();
+
+            default:
+                throw new Error("Should not reach here");
+        }
+    }
+
+    @Override
+    public DataObject get(Class<?> type) throws DataObjectInterpretationException
+    {
+        DataObjectType dataObjectType = getDataObjectType(type)
+                .throwIfNull(() -> new DataObjectMalformationException("Duplicated metadata annotation in type: " + type.getCanonicalName()))
+                .throwIfEmpty(() -> new DataObjectMalformationException("Metadata annotation not found in type: " + type.getCanonicalName()))
+                .getSilently();
+
+        switch (dataObjectType)
+        {
+            case UNIQUE:
+                return getUnique0(type);
+
+            case MULTIPLE:
+                return getMultiple0(type);
+
+            case ELEMENT:
+                return getElement0(type);
         }
 
-        throw new IllegalStateException("Should not reach here");
+        throw new Error("Should not reach here");
     }
 
     @Override
@@ -1093,6 +1117,12 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             return type;
         }
 
+        @Override
+        public DataObjectType getDataObjectType()
+        {
+            return DataObjectType.ELEMENT;
+        }
+
         final Class<?> type;
 
         Map<String, ValueObject> values;
@@ -1158,6 +1188,12 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         public Class<?> getType()
         {
             return type;
+        }
+
+        @Override
+        public DataObjectType getDataObjectType()
+        {
+            return DataObjectType.UNIQUE;
         }
 
         @Override
@@ -1295,6 +1331,12 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         public Class<?> getType()
         {
             return type;
+        }
+
+        @Override
+        public DataObjectType getDataObjectType()
+        {
+            return DataObjectType.MULTIPLE;
         }
 
         final Class<?> type;

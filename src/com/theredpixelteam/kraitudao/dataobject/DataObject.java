@@ -83,4 +83,6 @@ public interface DataObject {
     public Map<String, ValueObject> getValues();
 
     public Class<?> getType();
+
+    public DataObjectType getDataObjectType();
 }
