@@ -137,14 +137,14 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         return () -> new DataSourceException.UnsupportedValueType("(Caused by Extractor) " + type.getCanonicalName());
     }
 
-    private static void checkForKeyToken(Class<?> type)
+    private void checkForKeyToken(Class<?> type) throws DataSourceException
     {
-        
+        if (!manipulator.supportType(type))
+            throw new DataSourceException("Unsupported key type: " + type.getCanonicalName());
     }
 
-    private static void checkForValueToken(Class<?> type)
+    private void checkForValueToken(Class<?> type) throws DataSourceException
     {
-
     }
 
     private void extract(ResultSet resultSet, Object object, ValueObject valueObject, StringBuilder prefix, Class<?>[] signature, Increment signaturePointer)
@@ -222,7 +222,22 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     private void extractMap(ResultSet resultSet, Object object, ValueObject valueObject, StringBuilder prefix,
                             Class<?>[] signature, Increment signaturePointer) throws DataSourceException
     {
+        try {
+            if (!resultSet.next())
+                return;
 
+            String mapTableIdentity = (String) extractorFactory.create(String.class, valueObject.getName())
+                    .orElseThrow(() -> new DataSourceError("STRING is not supported by extractor"))
+                    .extract(resultSet);
+
+
+
+            Class<?> mapKeyType = signature[signaturePointer.getAndInc()];
+
+            checkForKeyToken(mapKeyType);
+        } catch (SQLException | ClassCastException e) {
+            throw new DataSourceException(e);
+        }
     }
 
     private void extractSet(ResultSet resultSet, Object object, ValueObject valueObject, StringBuilder prefix,
@@ -581,9 +596,12 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
     private static Class<?> tryRemapping(Class<?> type)
     {
-        Class<?> remapped = REMAPPED.get(type);
+        if (Map.class.isAssignableFrom(type)
+                || List.class.isAssignableFrom(type)
+                || Set.class.isAssignableFrom(type))
+            return String.class;
 
-        return remapped == null ? type : remapped;
+        return type;
     }
 
     private volatile Transaction currentTransaction;
@@ -603,16 +621,6 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     protected DataArgumentWrapper argumentWrapper;
 
     protected DataExtractorFactory extractorFactory;
-
-    private static final Map<Class<?>, Class<?>> REMAPPED = new HashMap<Class<?>, Class<?>>() {
-        {
-            put(Map.class,          String.class);
-            put(List.class,         String.class);
-            put(Set.class,          String.class);
-//          put(Hashtable.class,    String.class); actually Map
-//          put(Vector.class,       String.class); actually List
-        }
-    };
 
     private class TransactionImpl implements Transaction
     {
