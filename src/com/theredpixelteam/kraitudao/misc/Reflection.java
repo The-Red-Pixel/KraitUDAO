@@ -25,6 +25,7 @@ import com.theredpixelteam.kraitudao.PlaceHolder;
 import com.theredpixelteam.kraitudao.reflect.*;
 import com.theredpixelteam.redtea.function.FunctionWithThrowable;
 import com.theredpixelteam.redtea.util.Optional;
+import com.theredpixelteam.redtea.util.ShouldNotReachHere;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -127,7 +128,7 @@ public class Reflection {
                 }
 
             default:
-                throw new Error("Should not reach here");
+                throw new ShouldNotReachHere();
         }
     }
 
@@ -175,7 +176,7 @@ public class Reflection {
                 }
 
             default:
-                throw new Error("Should not reach here");
+                throw new ShouldNotReachHere();
         }
     }
 

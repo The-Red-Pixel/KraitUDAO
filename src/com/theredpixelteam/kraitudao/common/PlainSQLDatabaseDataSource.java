@@ -36,6 +36,7 @@ import com.theredpixelteam.kraitudao.interpreter.common.StandardDataObjectInterp
 import com.theredpixelteam.redtea.function.Supplier;
 import com.theredpixelteam.redtea.function.SupplierWithThrowable;
 import com.theredpixelteam.redtea.util.Pair;
+import com.theredpixelteam.redtea.util.ShouldNotReachHere;
 import com.theredpixelteam.redtea.util.Vector3;
 import com.theredpixelteam.redtea.util.concurrent.Increment;
 import com.theredpixelteam.redtea.util.Optional;
@@ -147,6 +148,16 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     {
     }
 
+    private static Class<?> getSignature(Class<?>[] signature, Increment signaturePointer) throws DataSourceException
+    {
+        int index = signaturePointer.getAndInc();
+
+        if (index < signature.length)
+            return signature[index];
+
+        throw new DataSourceException(new DataObjectMalformationException("Uncompleted signature"));
+    }
+
     private void extract(ResultSet resultSet, Object object, ValueObject valueObject, StringBuilder prefix, Class<?>[] signature, Increment signaturePointer)
             throws DataSourceException
     {
@@ -173,7 +184,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                     signaturePointer = new Increment();
                 }
 
-                extractMap(resultSet, object, valueObject, prefix, signature, signaturePointer);
+                extractMap(resultSet, object, valueObject.getName(), prefix, signature, signaturePointer);
                 break;
 
             case SET:
@@ -215,26 +226,30 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                 break;
 
             default:
-                throw new Error("Should not reach here");
+                throw new ShouldNotReachHere();
         }
     }
 
-    private void extractMap(ResultSet resultSet, Object object, ValueObject valueObject, StringBuilder prefix,
+    private void extractMap(ResultSet resultSet, Object object, String column, StringBuilder prefix,
                             Class<?>[] signature, Increment signaturePointer) throws DataSourceException
     {
         try {
             if (!resultSet.next())
                 return;
 
-            String mapTableIdentity = (String) extractorFactory.create(String.class, valueObject.getName())
+            String mapTableIdentity = (String) extractorFactory.create(String.class, column)
                     .orElseThrow(() -> new DataSourceError("STRING is not supported by extractor"))
                     .extract(resultSet);
 
-
+            String mapTableName = tableName + "_XXSYNTHETIC_MAP_" + mapTableIdentity;
 
             Class<?> mapKeyType = signature[signaturePointer.getAndInc()];
+            Class<?> mapValueType = signature[signaturePointer.getAndInc()];
 
             checkForKeyToken(mapKeyType);
+
+            // TODO
+
         } catch (SQLException | ClassCastException e) {
             throw new DataSourceException(e);
         }
@@ -308,20 +323,26 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         } catch (DataObjectInterpretationException e) {
             throw new DataSourceException(e);
         }
-        else try
-        {
-            DataExtractor extractor = extractorFactory.create(dataType, prefix + valueObject.getName())
-                    .orElseThrow(typeUnsupportedByExtractor(dataType));
+        else
+            valueObject.set(object, extract0(resultSet, dataType, prefix.toString(), valueObject.getName()));
+    }
 
-            Object value = extractor.extract(resultSet);
+    private Object extract0(ResultSet resultSet, Class<?> dataType, String prefix, String columnName) throws DataSourceException
+    {
+        DataExtractor extractor = extractorFactory.create(dataType, prefix + columnName)
+                .orElseThrow(typeUnsupportedByExtractor(dataType));
 
-            if (!dataType.isInstance(value))
-                throw new DataSourceError("Extraction failure (Bad type)");
-
-            valueObject.set(object, value);
+        Object value;
+        try {
+            value = extractor.extract(resultSet);
         } catch (SQLException e) {
             throw new DataSourceException(e);
         }
+
+        if (!dataType.isInstance(value))
+            throw new DataSourceError("Extraction failure (Bad type)");
+
+        return value;
     }
 
     private static String[] valuesExceptKeys(DataObject dataObject)

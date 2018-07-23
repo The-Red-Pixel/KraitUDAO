@@ -29,6 +29,7 @@ import com.theredpixelteam.kraitudao.dataobject.ValueObject;
 import com.theredpixelteam.kraitudao.reflect.FieldEntry;
 import com.theredpixelteam.kraitudao.reflect.MethodEntry;
 import com.theredpixelteam.redtea.util.Optional;
+import com.theredpixelteam.redtea.util.ShouldNotReachHere;
 
 import java.util.*;
 
@@ -81,7 +82,7 @@ public class Misc {
                 break;
 
             default:
-                throw new Error("Should not reach here");
+                throw new ShouldNotReachHere();
         }
 
         builder.append(":")
@@ -129,7 +130,7 @@ public class Misc {
                 break;
 
             default:
-                throw new Error("Should not reach here");
+                throw new ShouldNotReachHere();
         }
 
         builder.append(toString(methodEntry.arguments()))

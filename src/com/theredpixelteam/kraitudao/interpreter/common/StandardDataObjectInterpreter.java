@@ -47,6 +47,7 @@ import com.theredpixelteam.redtea.predication.MultiPredicate;
 import com.theredpixelteam.redtea.predication.NamedPredicate;
 import com.theredpixelteam.redtea.util.Reference;
 import com.theredpixelteam.redtea.util.Optional;
+import com.theredpixelteam.redtea.util.ShouldNotReachHere;
 import com.theredpixelteam.redtea.util.ThreeStateOptional;
 
 import java.lang.annotation.Annotation;
@@ -95,7 +96,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
                 return ThreeStateOptional.ofNull();
 
             default:
-                throw new Error("Should not reach here");
+                throw new ShouldNotReachHere();
         }
     }
 
@@ -119,7 +120,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
                 return getElement0(type);
         }
 
-        throw new Error("Should not reach here");
+        throw new ShouldNotReachHere();
     }
 
     @Override
@@ -660,14 +661,17 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
                 break;
 
             case 0b001: // ValueList
+                checkListMetadata(valueObject.getName(), valueObject.getMetadata(ValueList.class).getSilently().signatured());
                 valueObject.structureType = StructureType.LIST;
                 break;
 
             case 0b010: // ValueMap
+                checkMapMetadata(valueObject.getName(), valueObject.getMetadata(ValueMap.class).getSilently().signatured());
                 valueObject.structureType = StructureType.MAP;
                 break;
 
             case 0b100: // ValueSet
+                checkSetMetadata(valueObject.getName(), valueObject.getMetadata(ValueSet.class).getSilently().signatured());
                 valueObject.structureType = StructureType.SET;
                 break;
 
@@ -677,6 +681,53 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             case 0b111: // duplicated
                 throw new DataObjectMalformationException("Duplicated @ValueList/@ValueMap/@ValueSet metadata");
         }
+    }
+
+    static DataObjectInterpretationException uncompletedSignature(String name)
+    {
+        return new DataObjectMalformationException("Uncompleted signature (Name: " + name + ")");
+    }
+
+    static DataObjectInterpretationException redundantSignature(String name)
+    {
+        return new DataObjectMalformationException("Redundant signature (Name: " + name + ")");
+    }
+
+    static void checkValueToken(String name, Class<?>[] signature, int index) throws DataObjectInterpretationException
+    {
+        if (!(index < signature.length))
+            throw uncompletedSignature(name);
+
+        Class<?> type = signature[index++];
+
+        if (Map.class.isAssignableFrom(type))
+            checkValueToken(name, signature, index + 1);
+        else if (List.class.isAssignableFrom(type))
+            checkValueToken(name, signature, index);
+        else if ((index + 1) != signature.length)
+            throw redundantSignature(name);
+    }
+
+    static void checkMapMetadata(String name, Class<?>[] signature) throws DataObjectInterpretationException
+    {
+        if (signature.length < 2)
+            throw uncompletedSignature(name);
+
+        checkValueToken(name, signature, 1);
+    }
+
+    static void checkSetMetadata(String name, Class<?>[] signature) throws DataObjectInterpretationException
+    {
+        if (signature.length == 0)
+            throw uncompletedSignature(name);
+
+        if (signature.length > 1)
+            throw redundantSignature(name);
+    }
+
+    static void checkListMetadata(String name, Class<?>[] signature) throws DataObjectInterpretationException
+    {
+        checkValueToken(name, signature, 0);
     }
 
     static void checkArgumentCount(Class<?>[] arguments, int required, String location, String name)
