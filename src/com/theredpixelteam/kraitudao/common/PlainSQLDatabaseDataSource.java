@@ -128,14 +128,24 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             throw new DataSourceException.Busy();
     }
 
-    private static Supplier<DataSourceException> typeUnsupportedByArgumentWrapper(Class<?> type)
+    private static DataSourceException typeUnsupportedByArgumentWrapper(Class<?> type)
     {
-        return () -> new DataSourceException.UnsupportedValueType("(Caused by ArgumentWrapper) " + type.getCanonicalName());
+        return new DataSourceException.UnsupportedValueType("(Caused by ArgumentWrapper) " + type.getCanonicalName());
     }
 
-    private static Supplier<DataSourceException> typeUnsupportedByExtractor(Class<?> type)
+    private static DataSourceException typeUnsupportedByExtractor(Class<?> type)
     {
-        return () -> new DataSourceException.UnsupportedValueType("(Caused by Extractor) " + type.getCanonicalName());
+        return new DataSourceException.UnsupportedValueType("(Caused by Extractor) " + type.getCanonicalName());
+    }
+
+    private static DataSourceException typeUnsupportedAsMapValue(Class<?> type)
+    {
+        return new DataSourceException.UnsupportedValueType("(As Map value)" + type.getCanonicalName());
+    }
+
+    private static DataSourceException duplicatedAnnotation(Class<?> type)
+    {
+        return new DataSourceException(new DataObjectMalformationException("Duplicated metadata annotation in class: " + type.getCanonicalName()));
     }
 
     private void checkForKeyToken(Class<?> type) throws DataSourceException
@@ -156,6 +166,12 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             return signature[index];
 
         throw new DataSourceException(new DataObjectMalformationException("Uncompleted signature"));
+    }
+
+    private void extract(ResultSet resultSet, Object object, ValueObject valueObject)
+            throws DataSourceException
+    {
+        extract(resultSet, object, valueObject, new StringBuilder(), null, null);
     }
 
     private void extract(ResultSet resultSet, Object object, ValueObject valueObject, StringBuilder prefix, Class<?>[] signature, Increment signaturePointer)
@@ -243,12 +259,29 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
             String mapTableName = tableName + "_XXSYNTHETIC_MAP_" + mapTableIdentity;
 
-            Class<?> mapKeyType = signature[signaturePointer.getAndInc()];
-            Class<?> mapValueType = signature[signaturePointer.getAndInc()];
+            Class<?> mapKeyType = getSignature(signature, signaturePointer);
+            Class<?> mapValueType = getSignature(signature, signaturePointer);
 
             checkForKeyToken(mapKeyType);
+            checkForValueToken(mapValueType);
 
-            // TODO
+            interpreter.getDataObjectType(mapValueType)
+                    .throwIfNull(() -> duplicatedAnnotation(mapValueType))
+                    .ifPresent(dataObjectType -> {
+                        if (dataObjectType.ordinal() > 0)
+                            throw typeUnsupportedAsMapValue(mapValueType);
+
+                        // TODO expand element type
+                    })
+                    .orElse(() -> {
+                        Class<?> remappedMapValueType = tryRemapping(mapValueType);
+
+                        if (!manipulator.supportType(remappedMapValueType))
+                            throw typeUnsupportedAsMapValue(mapValueType);
+
+                        // TODO
+                    });
+
 
         } catch (SQLException | ClassCastException e) {
             throw new DataSourceException(e);
@@ -286,7 +319,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                     .throwIfEmpty(
                             () -> new DataSourceException(
                                     new DataObjectMalformationException("Bad constructor type of value object \"" + valueObject.getName() + "\"")))
-                    .getWhenNull(() -> ObjectConstructor.ofDefault(dataType));
+                    .whenNull(() -> ObjectConstructor.ofDefault(dataType));
 
             try {
                 T constructed = objectConstructor.newInstance(object);
@@ -330,7 +363,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     private Object extract0(ResultSet resultSet, Class<?> dataType, String prefix, String columnName) throws DataSourceException
     {
         DataExtractor extractor = extractorFactory.create(dataType, prefix + columnName)
-                .orElseThrow(typeUnsupportedByExtractor(dataType));
+                .orElseThrow(() -> typeUnsupportedByExtractor(dataType));
 
         Object value;
         try {
@@ -377,7 +410,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
                 values = valuesExceptKeys(dataObject);
                 keys = new Pair[] {Pair.of(key.getName(), argumentWrapper.wrap(keyValue)
-                            .orElseThrow(typeUnsupportedByArgumentWrapper(key.getType())))};
+                            .orElseThrow(() -> typeUnsupportedByArgumentWrapper(key.getType())))};
             }
             else if (dataObject instanceof MultipleDataObject)
             {
@@ -393,7 +426,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                     throw new DataSourceException("(pull) Null primary key \"" + primaryKey.getName() + "\" in MultipleDataObject");
 
                 keyList.add(Pair.of(primaryKey.getName(), argumentWrapper.wrap(primaryKeyValue)
-                        .orElseThrow(typeUnsupportedByArgumentWrapper(primaryKey.getType()))));
+                        .orElseThrow(() -> typeUnsupportedByArgumentWrapper(primaryKey.getType()))));
 
                 for (ValueObject secondaryKey : secondaryKeys)
                 {
@@ -403,7 +436,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                         throw new DataSourceException("(pull) Null secondary key \"" + secondaryKey.getName() + "\" in MultipleDataObject");
 
                     keyList.add(Pair.of(secondaryKey.getName(), argumentWrapper.wrap(secondaryKeyValue)
-                            .orElseThrow(typeUnsupportedByArgumentWrapper(secondaryKey.getType()))));
+                            .orElseThrow(() -> typeUnsupportedByArgumentWrapper(secondaryKey.getType()))));
                 }
 
                 values = valuesExceptKeys(dataObject);
