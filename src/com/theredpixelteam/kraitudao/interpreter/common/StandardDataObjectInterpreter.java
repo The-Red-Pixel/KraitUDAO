@@ -648,7 +648,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
                     .orElseThrow(() -> // really awful, I don't know why the <X extends Throwable> signature just gets lost when using rawtype of Optional
                             new DataObjectMalformationException("Illegal return type of constructor (Name: " + valueObject.getName() + ")"));
 
-            valueObject.objectConstructor = ObjectConstructor.of(callable.getReturnType(), (obj) -> callable.call(obj));
+            valueObject.objectConstructor = ObjectConstructor.of(callable.getReturnType(), (obj) -> callable.call(obj), constructor.onlyOnNull());
         });
 
         int i = (valueObject.hasMetadata(ValueList.class) ? 0b001 : 0)

@@ -38,6 +38,8 @@ public @interface Constructor {
 
     public MethodEntry value();
 
+    public boolean onlyOnNull() default true;
+
     @MetadataCollection(Constructor.class)
     @Retention(RetentionPolicy.RUNTIME)
     @Target(ElementType.FIELD)

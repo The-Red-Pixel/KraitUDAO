@@ -33,8 +33,7 @@ import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectMalformationException;
 import com.theredpixelteam.kraitudao.interpreter.common.StandardDataObjectExpander;
 import com.theredpixelteam.kraitudao.interpreter.common.StandardDataObjectInterpreter;
-import com.theredpixelteam.redtea.function.Supplier;
-import com.theredpixelteam.redtea.function.SupplierWithThrowable;
+import com.theredpixelteam.redtea.function.*;
 import com.theredpixelteam.redtea.util.Pair;
 import com.theredpixelteam.redtea.util.ShouldNotReachHere;
 import com.theredpixelteam.redtea.util.Vector3;
@@ -177,6 +176,22 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     private void extract(ResultSet resultSet, Object object, ValueObject valueObject, StringBuilder prefix, Class<?>[] signature, Increment signaturePointer)
             throws DataSourceException
     {
+        try {
+            if (!resultSet.next())
+                return;
+        } catch (SQLException e) {
+            throw new DataSourceException(e);
+        }
+
+        Object value = valueObject.get(object);
+        ObjectConstructor<?> constructor = valueObject.getConstructor()
+                .orElseGet(() -> ObjectConstructor.ofDefault(valueObject.getType()));
+
+        if (!constructor.onlyOnNull() || value == null)
+        {
+            // construct
+        }
+
         Class<?> dataType;
         switch (valueObject.getStructure())
         {
@@ -246,24 +261,27 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         }
     }
 
-    private void extractMap(ResultSet resultSet, Object object, String column, StringBuilder prefix,
-                            Class<?>[] signature, Increment signaturePointer) throws DataSourceException
+    private <K, V> void extractMap(ResultSet resultSet,
+                            BiConsumerWithThrowable<K, V, ? extends Throwable> put,
+                            String column,
+                            StringBuilder prefix,
+                            Class<?>[] signature,
+                            Increment signaturePointer) throws DataSourceException
     {
         try {
-            if (!resultSet.next())
-                return;
-
             String mapTableIdentity = (String) extractorFactory.create(String.class, column)
                     .orElseThrow(() -> new DataSourceError("STRING is not supported by extractor"))
                     .extract(resultSet);
 
             String mapTableName = tableName + "_XXSYNTHETIC_MAP_" + mapTableIdentity;
 
-            Class<?> mapKeyType = getSignature(signature, signaturePointer);
-            Class<?> mapValueType = getSignature(signature, signaturePointer);
+            Class<K> mapKeyType = (Class<K>) getSignature(signature, signaturePointer);
+            Class<V> mapValueType = (Class<V>) getSignature(signature, signaturePointer);
 
             checkForKeyToken(mapKeyType);
             checkForValueToken(mapValueType);
+
+            K mapKeyObject = (K) extract0(resultSet, mapKeyType, prefix.toString(), "K");
 
             interpreter.getDataObjectType(mapValueType)
                     .throwIfNull(() -> duplicatedAnnotation(mapValueType))
@@ -750,5 +768,29 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         }
 
         private final List<Pair<ValueObject, Object>> injectiveElements = new ArrayList<>();
+    }
+
+    private static class ResultSetImplication // for single line operation
+    {
+        ResultSetImplication(ResultSet resultSet)
+        {
+            this.resultSet = resultSet;
+        }
+
+        public ResultSet getResultSet()
+        {
+            return resultSet;
+        }
+
+        public boolean hasData() throws SQLException
+        {
+            if (hasData == null)
+                return this.hasData = resultSet.next();
+            return hasData;
+        }
+
+        private final ResultSet resultSet;
+
+        private Boolean hasData;
     }
 }

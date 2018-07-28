@@ -29,6 +29,8 @@ public interface ObjectConstructor<T> {
 
     public Class<T> getType();
 
+    public boolean onlyOnNull();
+
     @SuppressWarnings("unchecked")
     public default <R> Optional<ObjectConstructor<R>> as(Class<R> type)
     {
@@ -37,13 +39,19 @@ public interface ObjectConstructor<T> {
         return Optional.empty();
     }
 
-    public static <T> ObjectConstructor<T> of(Class<T> type, FunctionWithThrowable<Object, T, Exception> supplier)
+    public static <T> ObjectConstructor<T> of(Class<T> type, FunctionWithThrowable<Object, T, Exception> supplier, final boolean onlyOnNull)
     {
         return new ObjectConstructor<T>() {
             @Override
             public T newInstance(Object object) throws Exception
             {
                 return supplier.apply(object);
+            }
+
+            @Override
+            public boolean onlyOnNull()
+            {
+                return onlyOnNull;
             }
 
             @Override
@@ -56,6 +64,6 @@ public interface ObjectConstructor<T> {
 
     public static <T> ObjectConstructor<T> ofDefault(Class<T> type)
     {
-        return of(type, (obj) -> type.newInstance());
+        return of(type, (obj) -> type.newInstance(), true);
     }
 }
