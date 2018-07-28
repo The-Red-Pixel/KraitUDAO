@@ -34,11 +34,9 @@ import com.theredpixelteam.kraitudao.interpreter.DataObjectMalformationException
 import com.theredpixelteam.kraitudao.interpreter.common.StandardDataObjectExpander;
 import com.theredpixelteam.kraitudao.interpreter.common.StandardDataObjectInterpreter;
 import com.theredpixelteam.redtea.function.*;
-import com.theredpixelteam.redtea.util.Pair;
-import com.theredpixelteam.redtea.util.ShouldNotReachHere;
-import com.theredpixelteam.redtea.util.Vector3;
-import com.theredpixelteam.redtea.util.concurrent.Increment;
+import com.theredpixelteam.redtea.util.*;
 import com.theredpixelteam.redtea.util.Optional;
+import com.theredpixelteam.redtea.util.concurrent.Increment;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -187,9 +185,10 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         ObjectConstructor<?> constructor = valueObject.getConstructor()
                 .orElseGet(() -> ObjectConstructor.ofDefault(valueObject.getType()));
 
-        if (!constructor.onlyOnNull() || value == null)
-        {
-            // construct
+        if (!constructor.onlyOnNull() || value == null) try {
+            valueObject.set(object, value = constructor.newInstance(object));
+        } catch (Exception e) {
+            throw new DataSourceException("Construction failure", e);
         }
 
         Class<?> dataType;
@@ -215,7 +214,15 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                     signaturePointer = new Increment();
                 }
 
-                extractMap(resultSet, object, valueObject.getName(), prefix, signature, signaturePointer);
+                final Map<Object, Object> map;
+
+                try {
+                    map = (Map) value;
+                } catch (ClassCastException e) {
+                    throw new DataSourceError(e);
+                }
+
+                extractMap(resultSet, map::put, valueObject.getName(), prefix, signature, signaturePointer);
                 break;
 
             case SET:
@@ -283,23 +290,27 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
             K mapKeyObject = (K) extract0(resultSet, mapKeyType, prefix.toString(), "K");
 
-            interpreter.getDataObjectType(mapValueType)
-                    .throwIfNull(() -> duplicatedAnnotation(mapValueType))
-                    .ifPresent(dataObjectType -> {
-                        if (dataObjectType.ordinal() > 0)
-                            throw typeUnsupportedAsMapValue(mapValueType);
+            ThreeStateOptional<DataObjectType> dataObjectTypeOptional = interpreter.getDataObjectType(mapValueType)
+                    .throwIfNull(() -> duplicatedAnnotation(mapValueType));
 
-                        // TODO expand element type
-                    })
-                    .orElse(() -> {
-                        Class<?> remappedMapValueType = tryRemapping(mapValueType);
+            if (dataObjectTypeOptional.isPresent())
+            {
+                DataObjectType dataObjectType = dataObjectTypeOptional.getSilently();
 
-                        if (!manipulator.supportType(remappedMapValueType))
-                            throw typeUnsupportedAsMapValue(mapValueType);
+                if (dataObjectType.ordinal() > 0)
+                    throw typeUnsupportedAsMapValue(mapValueType);
 
-                        // TODO
-                    });
+                // TODO expand element type
+            }
+            else
+            {
+                Class<?> remappedMapValueType = tryRemapping(mapValueType);
 
+                if (!manipulator.supportType(remappedMapValueType))
+                    throw typeUnsupportedAsMapValue(mapValueType);
+
+                // TODO
+            }
 
         } catch (SQLException | ClassCastException e) {
             throw new DataSourceException(e);

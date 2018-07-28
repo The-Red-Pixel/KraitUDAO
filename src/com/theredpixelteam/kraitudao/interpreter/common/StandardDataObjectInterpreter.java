@@ -1462,12 +1462,15 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         {
             Objects.requireNonNull(object, "object");
 
+            if(!this.ownerType.isInstance(object))
+                throwIncapableObject(object, this.ownerType);
+
             return get0(object);
         }
 
         static void throwIncapableObject(Object object, Class<?> expected) throws DataObjectException
         {
-            throw new DataObjectException("Incapable object: Type of " + object.getClass().getCanonicalName() + "(" + expected.getCanonicalName() + " expected)");
+            throw new DataObjectException("Incapable object: Type of " + object.getClass().getCanonicalName() + "(" + expected.getCanonicalName() + " or subclass expected)");
         }
 
         @Override
@@ -1475,9 +1478,6 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         {
             Objects.requireNonNull(object, "object");
             Objects.requireNonNull(type, "type");
-
-            if(!this.ownerType.isInstance(object))
-                throwIncapableObject(object, this.ownerType);
 
             Object returned = get(object);
 
