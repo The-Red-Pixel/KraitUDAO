@@ -1132,6 +1132,11 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
 
     static abstract class DataObjectContainer implements DataObject
     {
+        DataObjectContainer(Class<?> type)
+        {
+            this.objectConstructor = ObjectConstructor.ofDefault(type);
+        }
+
         abstract void putKey(KeyType type, ValueObject valueObject) throws DataObjectInterpretationException;
 
         abstract void putValue(ValueObject valueObject) throws DataObjectInterpretationException;
@@ -1147,9 +1152,9 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         }
 
         @Override
-        public Optional<ObjectConstructor<?>> getConstructor()
+        public ObjectConstructor<?> getConstructor()
         {
-            return Optional.ofNullable(objectConstructor);
+            return objectConstructor;
         }
 
         @Override
@@ -1177,6 +1182,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
     {
         ElementDataObjectContainer(Class<?> type)
         {
+            super(type);
             this.values = new HashMap<>();
             this.type = type;
         }
@@ -1254,6 +1260,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
     {
         UniqueDataObjectContainer(Class<?> type)
         {
+            super(type);
             this.values = new HashMap<>();
             this.type = type;
         }
@@ -1352,6 +1359,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
     {
         MultipleDataObjectContainer(Class<?> type)
         {
+            super(type);
             this.type = type;
             this.secondaryKeys = new HashMap<>();
             this.values = new HashMap<>();
@@ -1478,6 +1486,8 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             this.type = type;
             this.compatibleType = compatibleType;
             this.metadata = new HashMap<>();
+
+            this.objectConstructor = ObjectConstructor.ofDefault(type);
         }
 
         void seal() throws DataObjectInterpretationException
@@ -1630,9 +1640,9 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         }
 
         @Override
-        public Optional<ObjectConstructor<?>> getConstructor()
+        public ObjectConstructor<?> getConstructor()
         {
-            return Optional.ofNullable(objectConstructor);
+            return objectConstructor;
         }
 
         @Override

@@ -21,11 +21,10 @@
 
 package com.theredpixelteam.kraitudao.dataobject;
 
-import com.theredpixelteam.kraitudao.ObjectConstructor;
 import com.theredpixelteam.redtea.util.Optional;
 import com.theredpixelteam.redtea.util.ThreeStateOptional;
 
-public interface ValueObject extends Metadatable {
+public interface ValueObject extends Metadatable, Constructable {
     public String getName();
 
     public StructureType getStructure();
@@ -54,24 +53,6 @@ public interface ValueObject extends Metadatable {
     public boolean isSecondaryKey();
 
     public Optional<ExpandRule> getExpandRule();
-
-    @SuppressWarnings("all")
-    public default <T> ThreeStateOptional<ObjectConstructor<T>> getConstructor(Class<T> type)
-    {
-        Optional<ObjectConstructor<?>> optional = getConstructor();
-
-        if(!optional.isPresent())
-            return ThreeStateOptional.empty();
-
-        ObjectConstructor<?> constructor = optional.get();
-
-        if(!type.isAssignableFrom(constructor.getType()))
-            return ThreeStateOptional.ofNull();
-
-        return ThreeStateOptional.of((ObjectConstructor<T>) constructor);
-    }
-
-    public Optional<ObjectConstructor<?>> getConstructor();
 
     public default boolean isExpandable()
     {

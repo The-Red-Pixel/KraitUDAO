@@ -27,7 +27,7 @@ import com.theredpixelteam.redtea.util.ThreeStateOptional;
 
 import java.util.Map;
 
-public interface DataObject extends Metadatable {
+public interface DataObject extends Metadatable, Constructable {
     public default boolean hasValue(String name)
     {
         return getValue(name).isPresent();
@@ -42,23 +42,7 @@ public interface DataObject extends Metadatable {
 
     public Optional<ValueObject> getValueObject(String name);
 
-    public Optional<ObjectConstructor<?>> getConstructor();
 
-    @SuppressWarnings("all")
-    public default <T> ThreeStateOptional<ObjectConstructor<T>> getConstructor(Class<T> type)
-    {
-        Optional<ObjectConstructor<?>> optional = getConstructor();
-
-        if(!optional.isPresent())
-            return ThreeStateOptional.empty();
-
-        ObjectConstructor<?> constructor = optional.get();
-
-        if(!type.isAssignableFrom(constructor.getType()))
-            return ThreeStateOptional.ofNull();
-
-        return ThreeStateOptional.of((ObjectConstructor<T>) constructor);
-    }
 
     public default boolean hasValueObject(String name)
     {

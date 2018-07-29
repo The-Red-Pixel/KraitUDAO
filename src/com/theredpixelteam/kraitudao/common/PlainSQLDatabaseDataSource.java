@@ -182,8 +182,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         }
 
         Object value = valueObject.get(object);
-        ObjectConstructor<?> constructor = valueObject.getConstructor()
-                .orElseGet(() -> ObjectConstructor.ofDefault(valueObject.getType()));
+        ObjectConstructor<?> constructor = valueObject.getConstructor();
 
         if (!constructor.onlyOnNull() || value == null) try {
             valueObject.set(object, value = constructor.newInstance(object));
@@ -345,10 +344,9 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                 break EXPANDABLE_OBJECT_CONSTRUCTION;
 
             ObjectConstructor<T> objectConstructor = valueObject.getConstructor(dataType)
-                    .throwIfEmpty(
+                    .orElseThrow(
                             () -> new DataSourceException(
-                                    new DataObjectMalformationException("Bad constructor type of value object \"" + valueObject.getName() + "\"")))
-                    .whenNull(() -> ObjectConstructor.ofDefault(dataType));
+                                    new DataObjectMalformationException("Bad constructor type of value object \"" + valueObject.getName() + "\"")));
 
             try {
                 T constructed = objectConstructor.newInstance(object);
