@@ -42,6 +42,7 @@ import com.theredpixelteam.kraitudao.misc.Misc;
 import com.theredpixelteam.kraitudao.misc.Reflection;
 import com.theredpixelteam.kraitudao.reflect.Callable;
 import com.theredpixelteam.kraitudao.reflect.MethodEntry;
+import com.theredpixelteam.redtea.function.Consumer;
 import com.theredpixelteam.redtea.predication.MultiCondition;
 import com.theredpixelteam.redtea.predication.MultiPredicate;
 import com.theredpixelteam.redtea.predication.NamedPredicate;
@@ -302,6 +303,20 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
                 throw new DataObjectMalformationException(info.toString(), e);
             }
         }
+
+        // metadata
+        for (Annotation annotation : type.getDeclaredAnnotations())
+        {
+            Class<?> annotationType = annotation.annotationType();
+
+            if (annotationType.getAnnotation(MetadataCollection.class) != null)
+                throw new DataObjectMalformationException("Multi-Metadata declaration not allowed on class scope");
+
+            if (annotationType.getAnnotation(Metadata.class) != null)
+                container.metadataMap.put(annotationType, annotation);
+        }
+
+        parseMetadata(container);
     }
 
     private static ValueObjectContainer parseValueObject(Class<?> type, DataObjectContainer container, InheritanceInfo info)
@@ -632,24 +647,56 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         }
     }
 
-    private static <T> void parseMetadata(ValueObjectContainer valueObject) throws DataObjectInterpretationException
+    private static <T> void parseMetadataOfConstructor(Metadatable metadatable,
+                                                       String name,
+                                                       Class<?> source,
+                                                       Class<T> dest,
+                                                       Consumer<ObjectConstructor<? extends T>> consumer)
+            throws DataObjectInterpretationException
     {
-        valueObject.getMetadata(Constructor.class).ifPresent((constructor) -> {
+        metadatable.getMetadata(Constructor.class).ifPresent((constructor) -> {
             MethodEntry constructorEntry = constructor.value();
 
             if(constructorEntry.arguments().length != 0)
                 throw new DataObjectMalformationException("Arguments not allowed in method entry of @Constructor");
 
-            Callable callable = Reflection.of(valueObject.getOwnerType(), constructorEntry)
+            Callable callable = Reflection.of(source, constructorEntry)
                     .orElseThrow(() ->
-                            new DataObjectMalformationException("No such method: " + Misc.toString(valueObject.getOwnerType(), constructorEntry)));
+                            new DataObjectMalformationException("No such method: " + Misc.toString(source, constructorEntry)));
 
-            ((Callable<T>) callable).as((Class<T>) valueObject.type)
+            ((Callable<T>) callable).as(dest)
                     .orElseThrow(() -> // really awful, I don't know why the <X extends Throwable> signature just gets lost when using rawtype of Optional
-                            new DataObjectMalformationException("Illegal return type of constructor (Name: " + valueObject.getName() + ")"));
+                            new DataObjectMalformationException("Illegal return type of constructor (Name: " + name + ")"));
 
-            valueObject.objectConstructor = ObjectConstructor.of(callable.getReturnType(), (obj) -> callable.call(obj), constructor.onlyOnNull());
+            consumer.accept(
+                    (ObjectConstructor<? extends T>) ObjectConstructor.of(
+                            callable.getReturnType(),
+                            (obj) -> callable.call(obj),
+                            constructor.onlyOnNull())
+            );
         });
+    }
+
+    private static void parseMetadata(DataObjectContainer dataObject) throws DataObjectInterpretationException
+    {
+        parseMetadataOfConstructor(
+                dataObject,
+                dataObject.getType().getCanonicalName(),
+                dataObject.getType(),
+                dataObject.getType(),
+                (constructor) -> dataObject.objectConstructor = constructor
+        );
+    }
+
+    private static void parseMetadata(ValueObjectContainer valueObject) throws DataObjectInterpretationException
+    {
+        parseMetadataOfConstructor(
+                valueObject,
+                valueObject.getName(),
+                valueObject.getOwnerType(),
+                valueObject.getType(),
+                (constructor) -> valueObject.objectConstructor = constructor
+        );
 
         int i = (valueObject.hasMetadata(ValueList.class) ? 0b001 : 0)
                 | (valueObject.hasMetadata(ValueMap.class) ? 0b010 : 0)
@@ -1083,28 +1130,50 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
                     .next(a(OverrideSetter.class))
             .build());
 
-    static interface DataObjectContainer extends DataObject
+    static abstract class DataObjectContainer implements DataObject
     {
-        void putKey(KeyType type, ValueObject valueObject) throws DataObjectInterpretationException;
+        abstract void putKey(KeyType type, ValueObject valueObject) throws DataObjectInterpretationException;
 
-        void putValue(ValueObject valueObject) throws DataObjectInterpretationException;
+        abstract void putValue(ValueObject valueObject) throws DataObjectInterpretationException;
 
-        void seal() throws DataObjectInterpretationException; // except internal update
+        abstract void seal() throws DataObjectInterpretationException; // except internal update
 
-        boolean sealed();
+        abstract boolean sealed();
 
-        default void checkSeal()
+        void checkSeal()
         {
             if(sealed())
                 throw new IllegalStateException("Already sealed");
         }
+
+        @Override
+        public Optional<ObjectConstructor<?>> getConstructor()
+        {
+            return Optional.ofNullable(objectConstructor);
+        }
+
+        @Override
+        public <T extends Annotation> Optional<T> getMetadata(Class<T> type)
+        {
+            return (Optional<T>) Optional.ofNullable(metadataMap.get(type));
+        }
+
+        @Override
+        public Map<Class<?>, Annotation> getMetadataMap()
+        {
+            return Collections.unmodifiableMap(metadataMap);
+        }
+
+        final Map<Class<?>, Annotation> metadataMap = new HashMap<>();
+
+        ObjectConstructor<?> objectConstructor;
     }
 
     static class GlobalExpandRules extends HashMap<Class<?>, ExpandRule>
     {
     }
 
-    static class ElementDataObjectContainer implements ElementDataObject, DataObjectContainer
+    static class ElementDataObjectContainer extends DataObjectContainer implements ElementDataObject
     {
         ElementDataObjectContainer(Class<?> type)
         {
@@ -1181,7 +1250,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         private boolean sealed;
     }
 
-    static class UniqueDataObjectContainer implements UniqueDataObject, DataObjectContainer
+    static class UniqueDataObjectContainer extends DataObjectContainer implements UniqueDataObject
     {
         UniqueDataObjectContainer(Class<?> type)
         {
@@ -1279,7 +1348,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         private boolean sealed;
     }
 
-    static class MultipleDataObjectContainer implements MultipleDataObject, DataObjectContainer
+    static class MultipleDataObjectContainer extends DataObjectContainer implements MultipleDataObject
     {
         MultipleDataObjectContainer(Class<?> type)
         {

@@ -359,7 +359,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             }
         }
 
-        boolean elementAnnotated = valueObject.getType().getAnnotation(Element.class) != null;
+        boolean elementAnnotated = dataType.getAnnotation(Element.class) != null;
 
         if (!expandForcibly && elementAnnotated) try // EXPAND_ELEMENT_VALUE_OBJECT
         {

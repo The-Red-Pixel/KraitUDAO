@@ -21,11 +21,13 @@
 
 package com.theredpixelteam.kraitudao.dataobject;
 
+import com.theredpixelteam.kraitudao.ObjectConstructor;
 import com.theredpixelteam.redtea.util.Optional;
+import com.theredpixelteam.redtea.util.ThreeStateOptional;
 
 import java.util.Map;
 
-public interface DataObject {
+public interface DataObject extends Metadatable {
     public default boolean hasValue(String name)
     {
         return getValue(name).isPresent();
@@ -39,6 +41,24 @@ public interface DataObject {
     public Optional<ValueObject> getValue(String name);
 
     public Optional<ValueObject> getValueObject(String name);
+
+    public Optional<ObjectConstructor<?>> getConstructor();
+
+    @SuppressWarnings("all")
+    public default <T> ThreeStateOptional<ObjectConstructor<T>> getConstructor(Class<T> type)
+    {
+        Optional<ObjectConstructor<?>> optional = getConstructor();
+
+        if(!optional.isPresent())
+            return ThreeStateOptional.empty();
+
+        ObjectConstructor<?> constructor = optional.get();
+
+        if(!type.isAssignableFrom(constructor.getType()))
+            return ThreeStateOptional.ofNull();
+
+        return ThreeStateOptional.of((ObjectConstructor<T>) constructor);
+    }
 
     public default boolean hasValueObject(String name)
     {

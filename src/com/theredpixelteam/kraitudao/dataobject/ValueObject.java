@@ -55,7 +55,7 @@ public interface ValueObject extends Metadatable {
 
     public Optional<ExpandRule> getExpandRule();
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("all")
     public default <T> ThreeStateOptional<ObjectConstructor<T>> getConstructor(Class<T> type)
     {
         Optional<ObjectConstructor<?>> optional = getConstructor();
