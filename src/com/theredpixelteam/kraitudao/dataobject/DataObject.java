@@ -86,7 +86,5 @@ public interface DataObject extends Metadatable, Constructable {
 
     public Map<String, ValueObject> getValues();
 
-    public Class<?> getType();
-
     public DataObjectType getDataObjectType();
 }

@@ -29,8 +29,6 @@ public interface ValueObject extends Metadatable, Constructable {
 
     public StructureType getStructure();
 
-    public Class<?> getType();
-
     public Object get(Object object);
 
     public <T> ThreeStateOptional<T> get(Object object, Class<T> type);

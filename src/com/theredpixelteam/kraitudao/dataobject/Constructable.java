@@ -6,6 +6,8 @@ import com.theredpixelteam.redtea.util.Optional;
 public interface Constructable {
     public ObjectConstructor<?> getConstructor();
 
+    public Class<?> getType();
+
     @SuppressWarnings("unchecked")
     public default <T> Optional<ObjectConstructor<T>> getConstructor(Class<T> type)
     {

@@ -168,10 +168,10 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     private void extract(ResultSet resultSet, Object object, ValueObject valueObject)
             throws DataSourceException
     {
-        extract(resultSet, object, valueObject, new StringBuilder(), null, null);
+        extract(resultSet, object, valueObject, "", null, null);
     }
 
-    private void extract(ResultSet resultSet, Object object, ValueObject valueObject, StringBuilder prefix, Class<?>[] signature, Increment signaturePointer)
+    private void extract(ResultSet resultSet, Object object, ValueObject valueObject, String prefix, Class<?>[] signature, Increment signaturePointer)
             throws DataSourceException
     {
         try {
@@ -194,7 +194,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         switch (valueObject.getStructure())
         {
             case VALUE:
-                extractValue(resultSet, object, valueObject, new StringBuilder());
+                extractValue(resultSet, object, valueObject, "");
                 break;
 
             case MAP:
@@ -221,7 +221,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                     throw new DataSourceError(e);
                 }
 
-                extractMap(resultSet, map::put, valueObject.getName(), prefix, signature, signaturePointer);
+                extractMap(resultSet, map::put, valueObject.getName(), "", signature, signaturePointer);
                 break;
 
             case SET:
@@ -268,11 +268,11 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     }
 
     private <K, V> void extractMap(ResultSet resultSet,
-                            BiConsumerWithThrowable<K, V, ? extends Throwable> put,
-                            String column,
-                            StringBuilder prefix,
-                            Class<?>[] signature,
-                            Increment signaturePointer) throws DataSourceException
+                                   BiConsumerWithThrowable<K, V, ? extends Throwable> put,
+                                   String column,
+                                   String prefix,
+                                   Class<?>[] signature,
+                                   Increment signaturePointer) throws DataSourceException
     {
         try {
             String mapTableIdentity = (String) extractorFactory.create(String.class, column)
@@ -287,19 +287,34 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             checkForKeyToken(mapKeyType);
             checkForValueToken(mapValueType);
 
-            K mapKeyObject = (K) extract0(resultSet, mapKeyType, prefix.toString(), "K");
+            K mapKeyObject = (K) extract0(resultSet, mapKeyType, prefix, "K");
 
             ThreeStateOptional<DataObjectType> dataObjectTypeOptional = interpreter.getDataObjectType(mapValueType)
                     .throwIfNull(() -> duplicatedAnnotation(mapValueType));
 
-            if (dataObjectTypeOptional.isPresent())
+            if (dataObjectTypeOptional.isPresent()) // @Element
             {
                 DataObjectType dataObjectType = dataObjectTypeOptional.getSilently();
 
                 if (dataObjectType.ordinal() > 0)
                     throw typeUnsupportedAsMapValue(mapValueType);
 
-                // TODO expand element type
+                ElementDataObject mapValueDataObject;
+                try {
+                    mapValueDataObject = (ElementDataObject) container.interpretIfAbsent(mapValueType, interpreter);
+                } catch (ClassCastException | DataObjectInterpretationException e) {
+                    throw new DataSourceException("Exception occurred when interpreting element data object in map value", e);
+                }
+
+                V mapValueObject;
+                try {
+                    mapValueObject = (V) mapValueDataObject.getConstructor().newInstance(null);
+                } catch (Exception e) {
+                    throw new DataSourceException("Exception occurred when constructing element data object in map value", e);
+                }
+
+                for (ValueObject elementValueObject : mapValueDataObject.getValues().values())
+                    extract(resultSet, mapValueObject, elementValueObject, prefix + "V_", signature, signaturePointer);
             }
             else
             {
@@ -316,21 +331,21 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         }
     }
 
-    private void extractSet(ResultSet resultSet, Object object, ValueObject valueObject, StringBuilder prefix,
+    private void extractSet(ResultSet resultSet, Object object, ValueObject valueObject, String prefix,
                             Class<?>[] signature, Increment signaturePointer) throws DataSourceException
     {
 
     }
 
-    private void extractList(ResultSet resultSet, Object object, ValueObject valueObject, StringBuilder prefix,
+    private void extractList(ResultSet resultSet, Object object, ValueObject valueObject, String prefix,
                              Class<?>[] signature, Increment signaturePointer) throws DataSourceException
     {
 
     }
 
-    private <T> void extractValue(ResultSet resultSet, Object object, ValueObject valueObject, StringBuilder prefix) throws DataSourceException
+    private void extractValue(ResultSet resultSet, Object object, ValueObject valueObject, String prefix) throws DataSourceException
     {
-        Class<T> dataType = (Class<T>) valueObject.getType();
+        Class<?> dataType = valueObject.getType();
 
         boolean supported = manipulator.supportType(dataType);
         boolean expandForcibly = valueObject.hasMetadata(ExpandForcibly.class);
@@ -343,15 +358,9 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             if (valueObject.get(object) != null)
                 break EXPANDABLE_OBJECT_CONSTRUCTION;
 
-            ObjectConstructor<T> objectConstructor = valueObject.getConstructor(dataType)
-                    .orElseThrow(
-                            () -> new DataSourceException(
-                                    new DataObjectMalformationException("Bad constructor type of value object \"" + valueObject.getName() + "\"")));
-
             try {
-                T constructed = objectConstructor.newInstance(object);
-
-                valueObject.set(object, constructed);
+                // Return type of the constructor should be verified during the interpretation
+                valueObject.set(object, valueObject.getConstructor().newInstance(object));
             } catch (Exception e) {
                 throw new DataSourceException("Construction failure", e);
             }
@@ -369,7 +378,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             ElementDataObject elementDataObject = (ElementDataObject) dataObject;
 
             for (ValueObject elementValueObject : elementDataObject.getValues().values())
-                extract(resultSet, object, elementValueObject, prefix.append(valueObject.getName()).append("_"), null, null);
+                extract(resultSet, object, elementValueObject, prefix + valueObject.getName() + "_", null, null);
         } catch (DataObjectInterpretationException e) {
             throw new DataSourceException(e);
         }
@@ -379,7 +388,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                     .orElseThrow(() -> new DataSourceException.UnsupportedValueType(dataType.getCanonicalName()));
 
             for (ValueObject expandedValueObject : expanded.values())
-                extract(resultSet, object, expandedValueObject, prefix.append(valueObject.getName()).append("_"), null, null);
+                extract(resultSet, object, expandedValueObject, prefix + valueObject.getName() + "_", null, null);
         } catch (DataObjectInterpretationException e) {
             throw new DataSourceException(e);
         }
@@ -477,7 +486,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                     return false;
 
                 for (ValueObject valueObject : dataObject.getValues().values())
-                        extract(resultSet, object, valueObject, new StringBuilder(), null, null);
+                        extract(resultSet, object, valueObject);
             } catch (SQLException e) {
                 throw new DataSourceException(e);
             }
