@@ -279,53 +279,53 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                     .orElseThrow(() -> new DataSourceError("STRING is not supported by extractor"))
                     .extract(resultSet);
 
-            String mapTableName = tableName + "_XXSYNTHETIC_MAP_" + mapTableIdentity;
-
             Class<K> mapKeyType = (Class<K>) getSignature(signature, signaturePointer);
             Class<V> mapValueType = (Class<V>) getSignature(signature, signaturePointer);
 
             checkForKeyToken(mapKeyType);
             checkForValueToken(mapValueType);
 
-            K mapKeyObject = (K) extract0(resultSet, mapKeyType, prefix, "K");
+            resultSet = manipulator.query(connection, asCollectionTableName(mapTableIdentity), null, null);
 
-            ThreeStateOptional<DataObjectType> dataObjectTypeOptional = interpreter.getDataObjectType(mapValueType)
-                    .throwIfNull(() -> duplicatedAnnotation(mapValueType));
-
-            if (dataObjectTypeOptional.isPresent()) // @Element
+            while (resultSet.next())
             {
-                DataObjectType dataObjectType = dataObjectTypeOptional.getSilently();
-
-                if (dataObjectType.ordinal() > 0)
-                    throw typeUnsupportedAsMapValue(mapValueType);
-
-                ElementDataObject mapValueDataObject;
-                try {
-                    mapValueDataObject = (ElementDataObject) container.interpretIfAbsent(mapValueType, interpreter);
-                } catch (ClassCastException | DataObjectInterpretationException e) {
-                    throw new DataSourceException("Exception occurred when interpreting element data object in map value", e);
-                }
-
+                K mapKeyObject = (K) extractRaw(resultSet, mapKeyType, prefix, "K");
                 V mapValueObject;
+
+                ThreeStateOptional<DataObjectType> dataObjectTypeOptional = interpreter.getDataObjectType(mapValueType)
+                        .throwIfNull(() -> duplicatedAnnotation(mapValueType));
+
+                if (dataObjectTypeOptional.isPresent()) // @Element
+                {
+                    DataObjectType dataObjectType = dataObjectTypeOptional.getSilently();
+
+                    if (dataObjectType.ordinal() > 0)
+                        throw typeUnsupportedAsMapValue(mapValueType);
+
+                    ElementDataObject mapValueDataObject;
+                    try {
+                        mapValueDataObject = (ElementDataObject) container.interpretIfAbsent(mapValueType, interpreter);
+                    } catch (ClassCastException | DataObjectInterpretationException e) {
+                        throw new DataSourceException("Exception occurred when interpreting element data object in map value", e);
+                    }
+
+                    try {
+                        mapValueObject = (V) mapValueDataObject.getConstructor().newInstance(null);
+                    } catch (Exception e) {
+                        throw new DataSourceException("Exception occurred when constructing element data object in map value", e);
+                    }
+
+                    for (ValueObject elementValueObject : mapValueDataObject.getValues().values())
+                        extract(resultSet, mapValueObject, elementValueObject, prefix + "V_", signature, signaturePointer);
+                } else
+                    mapValueObject = (V) extractRaw(resultSet, mapValueType, prefix, "V", signature, signaturePointer);
+
                 try {
-                    mapValueObject = (V) mapValueDataObject.getConstructor().newInstance(null);
-                } catch (Exception e) {
-                    throw new DataSourceException("Exception occurred when constructing element data object in map value", e);
+                    put.accept(mapKeyObject, mapValueObject);
+                } catch (Throwable e) {
+                    throw new DataSourceException("Exception occurred when putting elements into the map", e);
                 }
-
-                for (ValueObject elementValueObject : mapValueDataObject.getValues().values())
-                    extract(resultSet, mapValueObject, elementValueObject, prefix + "V_", signature, signaturePointer);
             }
-            else
-            {
-                Class<?> remappedMapValueType = tryRemapping(mapValueType);
-
-                if (!manipulator.supportType(remappedMapValueType))
-                    throw typeUnsupportedAsMapValue(mapValueType);
-
-                // TODO
-            }
-
         } catch (SQLException | ClassCastException e) {
             throw new DataSourceException(e);
         }
@@ -393,10 +393,57 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             throw new DataSourceException(e);
         }
         else
-            valueObject.set(object, extract0(resultSet, dataType, prefix.toString(), valueObject.getName()));
+            valueObject.set(object, extractRaw(resultSet, dataType, prefix, valueObject.getName()));
     }
 
-    private Object extract0(ResultSet resultSet, Class<?> dataType, String prefix, String columnName) throws DataSourceException
+    // including collection types
+    private Object extractRaw(ResultSet resultSet,
+                              Class<?> dataType,
+                              String prefix,
+                              String columnName,
+                              Class<?>[] signature,
+                              Increment signaturePointer)
+            throws DataSourceException
+    {
+        if (Collection.class.isAssignableFrom(dataType)) try
+        {
+            int i = (List.class.isAssignableFrom(dataType) ? 0b001 : 0)
+                    | (Set.class.isAssignableFrom(dataType) ? 0b010 : 0)
+                    | (Map.class.isAssignableFrom(dataType) ? 0b100 : 0);
+
+            switch (i)
+            {
+                case 0b011:
+                case 0b110:
+                case 0b101:
+                case 0b111:
+                    throw new DataSourceException(
+                            new DataObjectMalformationException("Vague collection type (Multi-implementation)")
+                    );
+
+                default:
+                    break;
+            }
+
+            DataExtractor extractor = extractorFactory.create(String.class, prefix + columnName)
+                    .orElseThrow(() -> typeUnsupportedByExtractor(String.class));
+
+            String collectionTableName = (String) extractor.extract(resultSet);
+            ResultSet collectionResultSet =  manipulator.query(connection, asCollectionTableName(collectionTableName), null, null);
+
+
+        } catch (SQLException e) {
+            throw new DataSourceException(e);
+        } catch (ClassCastException e) {
+            throw new DataSourceError(e);
+        }
+    }
+
+    // primitive types only
+    private Object extractRaw(ResultSet resultSet,
+                              Class<?> dataType,
+                              String prefix,
+                              String columnName) throws DataSourceException
     {
         DataExtractor extractor = extractorFactory.create(dataType, prefix + columnName)
                 .orElseThrow(() -> typeUnsupportedByExtractor(dataType));
@@ -692,6 +739,11 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             return String.class;
 
         return type;
+    }
+
+    private String asCollectionTableName(String identity)
+    {
+        return tableName + "_XXSYNTHETIC_COLLECTION_" + identity;
     }
 
     private volatile Transaction currentTransaction;
