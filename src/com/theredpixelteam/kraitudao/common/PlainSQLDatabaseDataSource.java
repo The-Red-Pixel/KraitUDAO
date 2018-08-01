@@ -137,7 +137,12 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
     private static DataSourceException typeUnsupportedAsMapValue(Class<?> type)
     {
-        return new DataSourceException.UnsupportedValueType("(As Map value)" + type.getCanonicalName());
+        return new DataSourceException.UnsupportedValueType("(As Map value) " + type.getCanonicalName());
+    }
+
+    private static DataSourceException typeUnsupportedAsListElement(Class<?> type)
+    {
+        return new DataSourceException.UnsupportedValueType("(As List element) " + type.getCanonicalName());
     }
 
     private static DataSourceException duplicatedAnnotation(Class<?> type)
@@ -168,10 +173,10 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     private void extract(ResultSet resultSet, Object object, ValueObject valueObject)
             throws DataSourceException
     {
-        extract(resultSet, object, valueObject, "", null, null);
+        extract(resultSet, object, valueObject, Prefix.of(), null, null);
     }
 
-    private void extract(ResultSet resultSet, Object object, ValueObject valueObject, String prefix, Class<?>[] signature, Increment signaturePointer)
+    private void extract(ResultSet resultSet, Object object, ValueObject valueObject, Prefix prefix, Class<?>[] signature, Increment signaturePointer)
             throws DataSourceException
     {
         try {
@@ -194,7 +199,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         switch (valueObject.getStructure())
         {
             case VALUE:
-                extractValue(resultSet, object, valueObject, "");
+                extractValue(resultSet, object, valueObject, prefix);
                 break;
 
             case MAP:
@@ -221,7 +226,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                     throw new DataSourceError(e);
                 }
 
-                extractMap(resultSet, map::put, valueObject.getName(), "", signature, signaturePointer);
+                extractMap(resultSet, map::put, valueObject.getName(), prefix, signature, signaturePointer);
                 break;
 
             case SET:
@@ -240,7 +245,15 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                     signaturePointer = new Increment();
                 }
 
-                extractSet(resultSet, object, valueObject, prefix, signature, signaturePointer);
+                final Set<Object> set;
+
+                try {
+                    set = (Set) value;
+                } catch (ClassCastException e) {
+                    throw new DataSourceError(e);
+                }
+
+                extractSet(resultSet, set::add, valueObject.getName(), prefix, signature, signaturePointer);
                 break;
 
             case LIST:
@@ -259,7 +272,15 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                     signaturePointer = new Increment();
                 }
 
-                extractList(resultSet, object, valueObject, prefix, signature, signaturePointer);
+                final List<Object> list;
+
+                try {
+                    list = (List) value;
+                } catch (ClassCastException e) {
+                    throw new DataSourceError(e);
+                }
+
+                extractList(resultSet, list::add, valueObject.getName(), prefix, signature, signaturePointer);
                 break;
 
             default:
@@ -270,13 +291,13 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     private <K, V> void extractMap(ResultSet resultSet,
                                    BiConsumerWithThrowable<K, V, ? extends Throwable> put,
                                    String column,
-                                   String prefix,
+                                   Prefix prefix,
                                    Class<?>[] signature,
                                    Increment signaturePointer) throws DataSourceException
     {
         try {
-            String mapTableIdentity = (String) extractorFactory.create(String.class, column)
-                    .orElseThrow(() -> new DataSourceError("STRING is not supported by extractor"))
+            String mapTableIdentity = (String) extractorFactory.create(String.class, prefix.apply(column))
+                    .orElseThrow(() -> typeUnsupportedByExtractor(String.class))
                     .extract(resultSet);
 
             Class<K> mapKeyType = (Class<K>) getSignature(signature, signaturePointer);
@@ -289,7 +310,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
             while (resultSet.next())
             {
-                K mapKeyObject = (K) extractRaw(resultSet, mapKeyType, prefix, "K");
+                K mapKeyObject = (K) extractRaw(resultSet, mapKeyType,  "K");
                 V mapValueObject;
 
                 ThreeStateOptional<DataObjectType> dataObjectTypeOptional = interpreter.getDataObjectType(mapValueType)
@@ -316,9 +337,10 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                     }
 
                     for (ValueObject elementValueObject : mapValueDataObject.getValues().values())
-                        extract(resultSet, mapValueObject, elementValueObject, prefix + "V_", signature, signaturePointer);
-                } else
-                    mapValueObject = (V) extractRaw(resultSet, mapValueType, prefix, "V", signature, signaturePointer);
+                        extract(resultSet, mapValueObject, elementValueObject, MAP_VALUE_PREFIX, signature, signaturePointer);
+                }
+                else
+                    mapValueObject = (V) extractRaw(resultSet, mapValueType, Prefix.of(), "V", signature, signaturePointer);
 
                 try {
                     put.accept(mapKeyObject, mapValueObject);
@@ -331,19 +353,102 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         }
     }
 
-    private void extractSet(ResultSet resultSet, Object object, ValueObject valueObject, String prefix,
-                            Class<?>[] signature, Increment signaturePointer) throws DataSourceException
+    private <E> void extractSet(ResultSet resultSet,
+                                ConsumerWithThrowable<E, ? extends Throwable> add,
+                                String column,
+                                Prefix prefix,
+                                Class<?>[] signature,
+                                Increment signaturePointer) throws DataSourceException
     {
+        try {
+            String setTableIdentity = (String) extractorFactory.create(String.class, prefix.apply(column))
+                    .orElseThrow(() -> typeUnsupportedByExtractor(String.class))
+                    .extract(resultSet);
 
+            Class<E> setElementType = (Class<E>) getSignature(signature, signaturePointer);
+
+            checkForKeyToken(setElementType);
+
+            resultSet = manipulator.query(connection, asCollectionTableName(setTableIdentity), null, null);
+
+            while (resultSet.next())
+            {
+                E setElementObject = (E) extractRaw(resultSet, setElementType, "E");
+
+                try {
+                    add.accept(setElementObject);
+                } catch (Throwable e) {
+                    throw new DataSourceException("Exception occurred when putting elements into the set", e);
+                }
+            }
+        } catch (SQLException | ClassCastException e) {
+            throw new DataSourceException(e);
+        }
     }
 
-    private void extractList(ResultSet resultSet, Object object, ValueObject valueObject, String prefix,
-                             Class<?>[] signature, Increment signaturePointer) throws DataSourceException
+    private <E> void extractList(ResultSet resultSet,
+                                 ConsumerWithThrowable<E, ? extends Throwable> add,
+                                 String column,
+                                 Prefix prefix,
+                                 Class<?>[] signature,
+                                 Increment signaturePointer) throws DataSourceException
     {
+        try {
+            String listTableIdentity = (String) extractorFactory.create(String.class, prefix.apply(column))
+                    .orElseThrow(() -> typeUnsupportedByExtractor(String.class))
+                    .extract(resultSet);
 
+            Class<E> listElementType = (Class<E>) getSignature(signature, signaturePointer);
+
+            checkForValueToken(listElementType);
+
+            resultSet = manipulator.query(connection, asCollectionTableName(listTableIdentity), null, null);
+
+            while (resultSet.next())
+            {
+                E listElementObject;
+
+                ThreeStateOptional<DataObjectType> dataObjectTypeOptional = interpreter.getDataObjectType(listElementType)
+                        .throwIfNull(() -> duplicatedAnnotation(listElementType));
+
+                if (dataObjectTypeOptional.isPresent())
+                {
+                    DataObjectType dataObjectType = dataObjectTypeOptional.getSilently();
+
+                    if (dataObjectType.ordinal() > 0)
+                        throw typeUnsupportedAsListElement(listElementType);
+
+                    ElementDataObject elementDataObject;
+                    try {
+                        elementDataObject = (ElementDataObject) container.interpretIfAbsent(listElementType, interpreter);
+                    } catch (ClassCastException | DataObjectInterpretationException e) {
+                        throw new DataSourceException("Exception occurred when interpreting element data object in list element", e);
+                    }
+
+                    try {
+                        listElementObject = (E) elementDataObject.getConstructor().newInstance(null);
+                    } catch (Exception e) {
+                        throw new DataSourceException("Exception occurred when constructing element data object in list element", e);
+                    }
+
+                    for (ValueObject elementValueObject : elementDataObject.getValues().values())
+                        extract(resultSet, listElementObject, elementValueObject, Prefix.of(), signature, signaturePointer);
+                }
+                else
+                    listElementObject = (E) extractRaw(resultSet, listElementType, Prefix.of(), "E", signature, signaturePointer);
+
+                try {
+                    add.accept(listElementObject);
+                } catch (Throwable e) {
+                    throw new DataSourceException("Exception occurred when putting elements into the list", e);
+                }
+            }
+        } catch (SQLException | ClassCastException e) {
+            throw new DataSourceException(e);
+        }
     }
 
-    private void extractValue(ResultSet resultSet, Object object, ValueObject valueObject, String prefix) throws DataSourceException
+    private void extractValue(ResultSet resultSet, Object object, ValueObject valueObject, Prefix prefix) throws DataSourceException
     {
         Class<?> dataType = valueObject.getType();
 
@@ -378,7 +483,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             ElementDataObject elementDataObject = (ElementDataObject) dataObject;
 
             for (ValueObject elementValueObject : elementDataObject.getValues().values())
-                extract(resultSet, object, elementValueObject, prefix + valueObject.getName() + "_", null, null);
+                extract(resultSet, object, elementValueObject, prefix.append(valueObject.getName()), null, null);
         } catch (DataObjectInterpretationException e) {
             throw new DataSourceException(e);
         }
@@ -388,23 +493,24 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                     .orElseThrow(() -> new DataSourceException.UnsupportedValueType(dataType.getCanonicalName()));
 
             for (ValueObject expandedValueObject : expanded.values())
-                extract(resultSet, object, expandedValueObject, prefix + valueObject.getName() + "_", null, null);
+                extract(resultSet, object, expandedValueObject, prefix.append(valueObject.getName()), null, null);
         } catch (DataObjectInterpretationException e) {
             throw new DataSourceException(e);
         }
         else
-            valueObject.set(object, extractRaw(resultSet, dataType, prefix, valueObject.getName()));
+            valueObject.set(object, extractRaw(resultSet, dataType, prefix.apply(valueObject.getName())));
     }
 
     // including collection types
     private Object extractRaw(ResultSet resultSet,
                               Class<?> dataType,
-                              String prefix,
+                              Prefix prefix,
                               String columnName,
                               Class<?>[] signature,
                               Increment signaturePointer)
             throws DataSourceException
     {
+        EXTRACT_COLLECTION:
         if (Collection.class.isAssignableFrom(dataType)) try
         {
             int i = (List.class.isAssignableFrom(dataType) ? 0b001 : 0)
@@ -422,14 +528,15 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                     );
 
                 default:
-                    break;
+                    if (i == 0)
+                        break EXTRACT_COLLECTION;
             }
 
-            DataExtractor extractor = extractorFactory.create(String.class, prefix + columnName)
+            DataExtractor extractor = extractorFactory.create(String.class, prefix.apply(columnName))
                     .orElseThrow(() -> typeUnsupportedByExtractor(String.class));
 
             String collectionTableName = (String) extractor.extract(resultSet);
-            ResultSet collectionResultSet =  manipulator.query(connection, asCollectionTableName(collectionTableName), null, null);
+            ResultSet collectionResultSet = manipulator.query(connection, asCollectionTableName(collectionTableName), null, null);
 
 
         } catch (SQLException e) {
@@ -437,15 +544,16 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         } catch (ClassCastException e) {
             throw new DataSourceError(e);
         }
+
+        return extractRaw(resultSet, dataType, prefix.apply(columnName));
     }
 
     // primitive types only
     private Object extractRaw(ResultSet resultSet,
                               Class<?> dataType,
-                              String prefix,
                               String columnName) throws DataSourceException
     {
-        DataExtractor extractor = extractorFactory.create(dataType, prefix + columnName)
+        DataExtractor extractor = extractorFactory.create(dataType, columnName)
                 .orElseThrow(() -> typeUnsupportedByExtractor(dataType));
 
         Object value;
@@ -764,6 +872,8 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
     protected DataExtractorFactory extractorFactory;
 
+    private static final Prefix MAP_VALUE_PREFIX = Prefix.of("V");
+
     private class TransactionImpl implements Transaction
     {
         TransactionImpl()
@@ -840,27 +950,74 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         private final List<Pair<ValueObject, Object>> injectiveElements = new ArrayList<>();
     }
 
-    private static class ResultSetImplication // for single line operation
+    private static class Prefix
     {
-        ResultSetImplication(ResultSet resultSet)
+        static Prefix of()
         {
-            this.resultSet = resultSet;
+            return EMPTY;
         }
 
-        public ResultSet getResultSet()
+        static Prefix of(String... contents)
         {
-            return resultSet;
+            if (contents.length == 0)
+                return of();
+
+            StringBuilder sb = new StringBuilder(contents[0]);
+            for (int i = 1; i < contents.length; i++)
+                sb.append("_").append(contents[i]);
+
+            return new Prefix(sb.toString());
         }
 
-        public boolean hasData() throws SQLException
+        private Prefix(String prefix)
         {
-            if (hasData == null)
-                return this.hasData = resultSet.next();
-            return hasData;
+            this.prefix = prefix;
         }
 
-        private final ResultSet resultSet;
+        @Override
+        public String toString()
+        {
+            return prefix;
+        }
 
-        private Boolean hasData;
+        public String apply(String string)
+        {
+            return prefix.isEmpty() ? string : prefix + "_" + string;
+        }
+
+        public Prefix append(String prefix)
+        {
+            return new Prefix(apply(prefix));
+        }
+
+        private final String prefix;
+
+        private static final Prefix EMPTY = new EmptyPrefix();
+
+        private static final class EmptyPrefix extends Prefix
+        {
+            private EmptyPrefix()
+            {
+                super("");
+            }
+
+            @Override
+            public String toString()
+            {
+                return "";
+            }
+
+            @Override
+            public String apply(String string)
+            {
+                return string;
+            }
+
+            @Override
+            public Prefix append(String prefix)
+            {
+                return Prefix.of(prefix);
+            }
+        }
     }
 }
