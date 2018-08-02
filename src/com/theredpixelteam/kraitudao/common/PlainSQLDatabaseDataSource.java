@@ -340,7 +340,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                         extract(resultSet, mapValueObject, elementValueObject, MAP_VALUE_PREFIX, signature, signaturePointer);
                 }
                 else
-                    mapValueObject = (V) extractRaw(resultSet, mapValueType, Prefix.of(), "V", signature, signaturePointer);
+                    mapValueObject = (V) extractRaw(resultSet, mapValueType, "V", Prefix.of(), signature, signaturePointer);
 
                 try {
                     put.accept(mapKeyObject, mapValueObject);
@@ -435,7 +435,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                         extract(resultSet, listElementObject, elementValueObject, Prefix.of(), signature, signaturePointer);
                 }
                 else
-                    listElementObject = (E) extractRaw(resultSet, listElementType, Prefix.of(), "E", signature, signaturePointer);
+                    listElementObject = (E) extractRaw(resultSet, listElementType, "E", Prefix.of(), signature, signaturePointer);
 
                 try {
                     add.accept(listElementObject);
@@ -504,8 +504,8 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     // including collection types
     private Object extractRaw(ResultSet resultSet,
                               Class<?> dataType,
-                              Prefix prefix,
                               String columnName,
+                              Prefix prefix,
                               Class<?>[] signature,
                               Increment signaturePointer)
             throws DataSourceException
@@ -532,15 +532,53 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                         break EXTRACT_COLLECTION;
             }
 
-            DataExtractor extractor = extractorFactory.create(String.class, prefix.apply(columnName))
-                    .orElseThrow(() -> typeUnsupportedByExtractor(String.class));
+            Object object;
+            try {
+                object = dataType.newInstance();
+            } catch (Exception e) {
+                throw new DataSourceException("Object construction failure", e);
+            }
 
-            String collectionTableName = (String) extractor.extract(resultSet);
-            ResultSet collectionResultSet = manipulator.query(connection, asCollectionTableName(collectionTableName), null, null);
+            switch (i)
+            {
+                case 0b001: // List
+                    final List<Object> list;
 
+                    try {
+                        list = (List) object;
+                    } catch (ClassCastException e) {
+                        throw new DataSourceError(e);
+                    }
 
-        } catch (SQLException e) {
-            throw new DataSourceException(e);
+                    extractList(resultSet, list::add, columnName, prefix, signature, signaturePointer);
+
+                    return list;
+
+                case 0b010: // Set
+                    final Set<Object> set;
+
+                    try {
+                        set = (Set) object;
+                    } catch (ClassCastException e) {
+                        throw new DataSourceError(e);
+                    }
+
+                    return set;
+
+                case 0b100: // Map
+                    final Map<Object, Object> map;
+
+                    try {
+                        map = (Map) object;
+                    } catch (ClassCastException e) {
+                        throw new DataSourceError(e);
+                    }
+
+                    return map;
+
+                default:
+                    throw new ShouldNotReachHere();
+            }
         } catch (ClassCastException e) {
             throw new DataSourceError(e);
         }
