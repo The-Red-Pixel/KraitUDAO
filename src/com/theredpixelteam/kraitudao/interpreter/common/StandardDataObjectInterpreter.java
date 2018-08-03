@@ -690,36 +690,63 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
 
     private static void parseMetadata(ValueObjectContainer valueObject) throws DataObjectInterpretationException
     {
-        parseMetadataOfConstructor(
-                valueObject,
-                valueObject.getName(),
-                valueObject.getOwnerType(),
-                valueObject.getType(),
-                (constructor) -> valueObject.objectConstructor = constructor
-        );
-
         int i = (valueObject.hasMetadata(ValueList.class) ? 0b001 : 0)
                 | (valueObject.hasMetadata(ValueMap.class) ? 0b010 : 0)
                 | (valueObject.hasMetadata(ValueSet.class) ? 0b100 : 0);
 
+
         switch(i)
         {
             case 0b000: // none
+                Class<?> type;
                 break;
 
             case 0b001: // ValueList
-                checkListMetadata(valueObject.getName(), valueObject.getMetadata(ValueList.class).getSilently().signatured());
+                ValueList valueList = valueObject.getMetadata(ValueList.class).getSilently();
+
+                type = valueList.type();
+
+                if (type == PlaceHolder.class)
+                    type = ArrayList.class;
+                else if (!List.class.isAssignableFrom(type))
+                    throw new DataObjectMalformationException(type.getCanonicalName() + " cannot be cast to a List");
+
+                checkListMetadata(valueObject.getName(), valueList.signatured());
+
                 valueObject.structureType = StructureType.LIST;
+                valueObject.objectConstructor = ObjectConstructor.ofDefault(type);
                 break;
 
             case 0b010: // ValueMap
-                checkMapMetadata(valueObject.getName(), valueObject.getMetadata(ValueMap.class).getSilently().signatured());
+                ValueMap valueMap = valueObject.getMetadata(ValueMap.class).getSilently();
+
+                type = valueMap.type();
+
+                if (type == PlaceHolder.class)
+                    type = HashMap.class;
+                else if (!Map.class.isAssignableFrom(type))
+                    throw new DataObjectMalformationException(type.getCanonicalName() + " cannot be cast to a Map");
+
+                checkMapMetadata(valueObject.getName(), valueMap.signatured());
+
                 valueObject.structureType = StructureType.MAP;
+                valueObject.objectConstructor = ObjectConstructor.ofDefault(type);
                 break;
 
             case 0b100: // ValueSet
+                ValueSet valueSet = valueObject.getMetadata(ValueSet.class).getSilently();
+
+                type = valueSet.type();
+
+                if (type == PlaceHolder.class)
+                    type = HashSet.class;
+                else if (!Set.class.isAssignableFrom(type))
+                    throw new DataObjectMalformationException(type.getCanonicalName() + " cannot be cast to a Set");
+
                 checkSetMetadata(valueObject.getName(), valueObject.getMetadata(ValueSet.class).getSilently().signatured());
+
                 valueObject.structureType = StructureType.SET;
+                valueObject.objectConstructor = ObjectConstructor.ofDefault(type);
                 break;
 
             case 0b011:
@@ -728,6 +755,14 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             case 0b111: // duplicated
                 throw new DataObjectMalformationException("Duplicated @ValueList/@ValueMap/@ValueSet metadata");
         }
+
+        parseMetadataOfConstructor(
+                valueObject,
+                valueObject.getName(),
+                valueObject.getOwnerType(),
+                valueObject.getType(),
+                (constructor) -> valueObject.objectConstructor = constructor
+        );
     }
 
     static DataObjectInterpretationException uncompletedSignature(String name)
@@ -745,7 +780,7 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         if (!(index < signature.length))
             throw uncompletedSignature(name);
 
-        Class<?> type = signature[index++];
+        Class<?> type = signature[index];
 
         if (Map.class.isAssignableFrom(type))
             checkValueToken(name, signature, index + 1);
@@ -1574,7 +1609,6 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
             Object returned = getter.get(object);
 
             Optional<IgnoreWhenEquals> ignoreWhenEquals = getMetadata(IgnoreWhenEquals.class);
-            System.out.println(getName() + ":" + ignoreWhenEquals.isPresent());
             if(ignoreWhenEquals.isPresent()
                     && returned.toString().equals(ignoreWhenEquals.get().value()))
                 return null;

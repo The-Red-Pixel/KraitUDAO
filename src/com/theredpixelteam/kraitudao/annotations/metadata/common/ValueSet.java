@@ -21,6 +21,7 @@
 
 package com.theredpixelteam.kraitudao.annotations.metadata.common;
 
+import com.theredpixelteam.kraitudao.PlaceHolder;
 import com.theredpixelteam.kraitudao.annotations.metadata.ExpandedName;
 import com.theredpixelteam.kraitudao.annotations.metadata.Metadata;
 import com.theredpixelteam.kraitudao.annotations.metadata.MetadataCollection;
@@ -34,11 +35,11 @@ import java.util.HashSet;
 @Repeatable(ValueSet.ValueSetRepeatable.class)
 public @interface ValueSet {
     @ExpandedName
-    public String name();
+    public String name() default "";
 
     public Class<?>[] signatured();
 
-    public Class<?> type() default HashSet.class;
+    public Class<?> type() default PlaceHolder.class;
 
     @MetadataCollection(ValueSet.class)
     @Target(ElementType.FIELD)

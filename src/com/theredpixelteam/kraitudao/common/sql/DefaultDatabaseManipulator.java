@@ -248,6 +248,9 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
     protected static void injectArguments(PreparedStatement preparedStatement, Pair<String, DataArgument>[] arguments)
             throws SQLException
     {
+        if (arguments == null || arguments.length == 0)
+            return;
+
         for(int i = 0; i < arguments.length;)
             arguments[i].second().apply(preparedStatement, ++i);
     }

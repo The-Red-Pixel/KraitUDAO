@@ -179,13 +179,6 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     private void extract(ResultSet resultSet, Object object, ValueObject valueObject, Prefix prefix, Class<?>[] signature, Increment signaturePointer)
             throws DataSourceException
     {
-        try {
-            if (!resultSet.next())
-                return;
-        } catch (SQLException e) {
-            throw new DataSourceException(e);
-        }
-
         Object value = valueObject.get(object);
         ObjectConstructor<?> constructor = valueObject.getConstructor();
 
@@ -195,7 +188,6 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             throw new DataSourceException("Construction failure", e);
         }
 
-        Class<?> dataType;
         switch (valueObject.getStructure())
         {
             case VALUE:
@@ -208,11 +200,6 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                     ValueMap valueMap = valueObject.getMetadata(ValueMap.class)
                             .orElseThrow(() -> new DataSourceException(
                                     new DataObjectMalformationException("Missing metadata @ValueMap (Name: " + valueObject.getName() + ")")));
-                    dataType = valueObject.getType();
-
-                    if (!dataType.isAssignableFrom(valueMap.type()))
-                        throw new DataSourceException(
-                                new DataObjectMalformationException("Illegal type in @ValueMap (Name: " + valueObject.getName() + ")"));
 
                     signature = valueMap.signatured();
                     signaturePointer = new Increment();
@@ -235,11 +222,6 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                     ValueSet valueSet = valueObject.getMetadata(ValueSet.class)
                             .orElseThrow(() -> new DataSourceException(
                                     new DataObjectMalformationException("Missing metadata @ValueSet (Name: " + valueObject.getName() + ")")));
-                    dataType = valueObject.getType();
-
-                    if (!dataType.isAssignableFrom(valueSet.type()))
-                        throw new DataSourceException(
-                                new DataObjectMalformationException("Illegal type in @ValueSet (Name: " + valueObject.getName() + ")"));
 
                     signature = valueSet.signatured();
                     signaturePointer = new Increment();
@@ -262,11 +244,6 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                     ValueList valueList = valueObject.getMetadata(ValueList.class)
                             .orElseThrow(() -> new DataSourceException(
                                     new DataObjectMalformationException("Missing metadata @ValueList (Name: " + valueObject.getName() + ")")));
-                    dataType = valueObject.getType();
-
-                    if (!dataType.isAssignableFrom(valueList.type()))
-                        throw new DataSourceException(
-                                new DataObjectMalformationException("Illegal type in @ValueList (Name: " + valueObject.getName() + ")"));
 
                     signature = valueList.signatured();
                     signaturePointer = new Increment();
@@ -679,7 +656,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                     return false;
 
                 for (ValueObject valueObject : dataObject.getValues().values())
-                        extract(resultSet, object, valueObject);
+                    extract(resultSet, object, valueObject);
             } catch (SQLException e) {
                 throw new DataSourceException(e);
             }
