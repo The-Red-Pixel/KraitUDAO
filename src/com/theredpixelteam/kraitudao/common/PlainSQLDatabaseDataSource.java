@@ -150,6 +150,11 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         return new DataSourceException(new DataObjectMalformationException("Duplicated metadata annotation in class: " + type.getCanonicalName()));
     }
 
+    private static DataSourceException vagueCollectionType()
+    {
+        return new DataSourceException(new DataObjectMalformationException("Vague collection type (Multi-implementation)"));
+    }
+
     private void checkForKeyToken(Class<?> type) throws DataSourceException
     {
         if (!manipulator.supportType(type))
@@ -273,17 +278,20 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                                    Increment signaturePointer) throws DataSourceException
     {
         try {
-            String mapTableIdentity = (String) extractorFactory.create(String.class, prefix.apply(column))
-                    .orElseThrow(() -> typeUnsupportedByExtractor(String.class))
-                    .extract(resultSet);
-
             Class<K> mapKeyType = (Class<K>) getSignature(signature, signaturePointer);
             Class<V> mapValueType = (Class<V>) getSignature(signature, signaturePointer);
 
             checkForKeyToken(mapKeyType);
             checkForValueToken(mapValueType);
 
-            resultSet = manipulator.query(connection, asCollectionTableName(mapTableIdentity), null, null);
+            if (column != null)
+            {
+                String mapTableIdentity = (String) extractorFactory.create(String.class, prefix.apply(column))
+                        .orElseThrow(() -> typeUnsupportedByExtractor(String.class))
+                        .extract(resultSet);
+
+                resultSet = manipulator.query(connection, asCollectionTableName(mapTableIdentity), null, null);
+            }
 
             while (resultSet.next())
             {
@@ -338,15 +346,18 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                                 Increment signaturePointer) throws DataSourceException
     {
         try {
-            String setTableIdentity = (String) extractorFactory.create(String.class, prefix.apply(column))
-                    .orElseThrow(() -> typeUnsupportedByExtractor(String.class))
-                    .extract(resultSet);
-
             Class<E> setElementType = (Class<E>) getSignature(signature, signaturePointer);
 
             checkForKeyToken(setElementType);
 
-            resultSet = manipulator.query(connection, asCollectionTableName(setTableIdentity), null, null);
+            if (column != null)
+            {
+                String setTableIdentity = (String) extractorFactory.create(String.class, prefix.apply(column))
+                        .orElseThrow(() -> typeUnsupportedByExtractor(String.class))
+                        .extract(resultSet);
+
+                resultSet = manipulator.query(connection, asCollectionTableName(setTableIdentity), null, null);
+            }
 
             while (resultSet.next())
             {
@@ -371,15 +382,18 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                                  Increment signaturePointer) throws DataSourceException
     {
         try {
-            String listTableIdentity = (String) extractorFactory.create(String.class, prefix.apply(column))
-                    .orElseThrow(() -> typeUnsupportedByExtractor(String.class))
-                    .extract(resultSet);
-
             Class<E> listElementType = (Class<E>) getSignature(signature, signaturePointer);
 
             checkForValueToken(listElementType);
 
-            resultSet = manipulator.query(connection, asCollectionTableName(listTableIdentity), null, null);
+            if (column != null)
+            {
+                String listTableIdentity = (String) extractorFactory.create(String.class, prefix.apply(column))
+                        .orElseThrow(() -> typeUnsupportedByExtractor(String.class))
+                        .extract(resultSet);
+
+                resultSet = manipulator.query(connection, asCollectionTableName(listTableIdentity), null, null);
+            }
 
             while (resultSet.next())
             {
@@ -499,9 +513,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                 case 0b110:
                 case 0b101:
                 case 0b111:
-                    throw new DataSourceException(
-                            new DataObjectMalformationException("Vague collection type (Multi-implementation)")
-                    );
+                    throw vagueCollectionType();
 
                 default:
                     if (i == 0)
@@ -673,7 +685,72 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     @Override
     public <T> boolean pull(T object, Class<T> type, Class<?>... signatured) throws DataSourceException
     {
-        return false;
+        int i = (List.class.isAssignableFrom(type) ? 0b001 : 0)
+                | (Set.class.isAssignableFrom(type) ? 0b010 : 0)
+                | (Map.class.isAssignableFrom(type) ? 0b100 : 0);
+
+        switch (i)
+        {
+            case 0b000:
+                throw new DataSourceException(type.getCanonicalName() + " is not a collection type");
+
+            case 0b011:
+            case 0b101:
+            case 0b110:
+            case 0b111:
+                throw vagueCollectionType();
+        }
+
+        ResultSet resultSet;
+        try {
+            resultSet = manipulator.query(connection, tableName, null, null);
+
+            if (!resultSet.next())
+                return false;
+        } catch (SQLException e) {
+            throw new DataSourceException(e);
+        }
+
+        switch (i)
+        {
+            case 0b001: // List
+                final List<Object> list;
+
+                try {
+                    list = (List) object;
+                } catch (ClassCastException e) {
+                    throw new DataSourceException(e);
+                }
+
+                extractList(resultSet, list::add, null, Prefix.of(), signatured, new Increment());
+                break;
+
+            case 0b010: // Set
+                final Set<Object> set;
+
+                try {
+                    set = (Set) object;
+                } catch (ClassCastException e) {
+                    throw new DataSourceException(e);
+                }
+
+                extractSet(resultSet, set::add, null, Prefix.of(), signatured, new Increment());
+                break;
+
+            case 0b100: // Map
+                final Map<Object, Object> map;
+
+                try {
+                    map = (Map) object;
+                } catch (ClassCastException e) {
+                    throw new DataSourceException(e);
+                }
+
+                extractMap(resultSet, map::put, null, Prefix.of(), signatured, new Increment());
+                break;
+        }
+
+        return true;
     }
 
     @Override
@@ -951,21 +1028,6 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         private Exception lastException;
 
         private boolean valid = true;
-    }
-
-    private static class KeyInjection
-    {
-        KeyInjection()
-        {
-        }
-
-        void inject(Object object)
-        {
-            for(Pair<ValueObject, Object> entry : injectiveElements)
-                entry.first().set(object, entry.second());
-        }
-
-        private final List<Pair<ValueObject, Object>> injectiveElements = new ArrayList<>();
     }
 
     private static class Prefix
