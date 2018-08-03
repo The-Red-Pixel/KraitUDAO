@@ -487,8 +487,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                               Increment signaturePointer)
             throws DataSourceException
     {
-        EXTRACT_COLLECTION:
-        if (Collection.class.isAssignableFrom(dataType)) try
+        EXTRACT_COLLECTION: try
         {
             int i = (List.class.isAssignableFrom(dataType) ? 0b001 : 0)
                     | (Set.class.isAssignableFrom(dataType) ? 0b010 : 0)
@@ -540,6 +539,8 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                         throw new DataSourceError(e);
                     }
 
+                    extractSet(resultSet, set::add, columnName, prefix, signature, signaturePointer);
+
                     return set;
 
                 case 0b100: // Map
@@ -550,6 +551,8 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                     } catch (ClassCastException e) {
                         throw new DataSourceError(e);
                     }
+
+                    extractMap(resultSet, map::put, columnName, prefix, signature, signaturePointer);
 
                     return map;
 

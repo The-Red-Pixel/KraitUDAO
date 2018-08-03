@@ -783,9 +783,9 @@ public class StandardDataObjectInterpreter implements DataObjectInterpreter {
         Class<?> type = signature[index];
 
         if (Map.class.isAssignableFrom(type))
-            checkValueToken(name, signature, index + 1);
+            checkValueToken(name, signature, index + 2);
         else if (List.class.isAssignableFrom(type))
-            checkValueToken(name, signature, index);
+            checkValueToken(name, signature, index + 1);
         else if ((index + 1) != signature.length)
             throw redundantSignature(name);
     }
