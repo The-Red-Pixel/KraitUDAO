@@ -165,6 +165,31 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     {
     }
 
+    private static int getCollectionType(Class<?> type) throws DataSourceException
+    {
+        return (List.class.isAssignableFrom(type) ? TYPE_LIST : 0)
+                | (Set.class.isAssignableFrom(type) ? TYPE_SET : 0)
+                | (Map.class.isAssignableFrom(type) ? TYPE_MAP : 0);
+    }
+
+    private static boolean isVagueCollectionType(int type)
+    {
+        return (type > 0b010 && type != 0b100);
+    }
+
+    private static int checkCollectionType(Class<?> type) throws DataSourceException
+    {
+        int i = getCollectionType(type);
+
+        if (i == 0)
+            throw new DataSourceException(type.getCanonicalName() + " is not a collection type");
+
+        if (isVagueCollectionType(i))
+            throw vagueCollectionType();
+
+        return i;
+    }
+
     private static Class<?> getSignature(Class<?>[] signature, Increment signaturePointer) throws DataSourceException
     {
         int index = signaturePointer.getAndInc();
@@ -503,22 +528,13 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     {
         EXTRACT_COLLECTION: try
         {
-            int i = (List.class.isAssignableFrom(dataType) ? 0b001 : 0)
-                    | (Set.class.isAssignableFrom(dataType) ? 0b010 : 0)
-                    | (Map.class.isAssignableFrom(dataType) ? 0b100 : 0);
+            int i = getCollectionType(dataType);
 
-            switch (i)
-            {
-                case 0b011:
-                case 0b110:
-                case 0b101:
-                case 0b111:
-                    throw vagueCollectionType();
+            if (i == 0)
+                break EXTRACT_COLLECTION;
 
-                default:
-                    if (i == 0)
-                        break EXTRACT_COLLECTION;
-            }
+            if (isVagueCollectionType(i))
+                throw vagueCollectionType();
 
             Object object;
             try {
@@ -527,50 +543,9 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                 throw new DataSourceException("Object construction failure", e);
             }
 
-            switch (i)
-            {
-                case 0b001: // List
-                    final List<Object> list;
+            extractCollection(resultSet, i, object, columnName, prefix, signature, signaturePointer);
 
-                    try {
-                        list = (List) object;
-                    } catch (ClassCastException e) {
-                        throw new DataSourceError(e);
-                    }
-
-                    extractList(resultSet, list::add, columnName, prefix, signature, signaturePointer);
-
-                    return list;
-
-                case 0b010: // Set
-                    final Set<Object> set;
-
-                    try {
-                        set = (Set) object;
-                    } catch (ClassCastException e) {
-                        throw new DataSourceError(e);
-                    }
-
-                    extractSet(resultSet, set::add, columnName, prefix, signature, signaturePointer);
-
-                    return set;
-
-                case 0b100: // Map
-                    final Map<Object, Object> map;
-
-                    try {
-                        map = (Map) object;
-                    } catch (ClassCastException e) {
-                        throw new DataSourceError(e);
-                    }
-
-                    extractMap(resultSet, map::put, columnName, prefix, signature, signaturePointer);
-
-                    return map;
-
-                default:
-                    throw new ShouldNotReachHere();
-            }
+            return object;
         } catch (ClassCastException e) {
             throw new DataSourceError(e);
         }
@@ -597,6 +572,60 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             throw new DataSourceError("Extraction failure (Bad type)");
 
         return value;
+    }
+
+    private void extractCollection(ResultSet resultSet,
+                                   int type,
+                                   Object object,
+                                   String column,
+                                   Prefix prefix,
+                                   Class<?>[] signature,
+                                   Increment signaturePointer) throws DataSourceException
+    {
+        switch (type)
+        {
+            case TYPE_LIST: // List
+                final List<Object> list;
+
+                try {
+                    list = (List) object;
+                } catch (ClassCastException e) {
+                    throw new DataSourceError(e);
+                }
+
+                extractList(resultSet, list::add, column, prefix, signature, signaturePointer);
+
+                break;
+
+            case TYPE_SET: // Set
+                final Set<Object> set;
+
+                try {
+                    set = (Set) object;
+                } catch (ClassCastException e) {
+                    throw new DataSourceError(e);
+                }
+
+                extractSet(resultSet, set::add, column, prefix, signature, signaturePointer);
+
+                break;
+
+            case TYPE_MAP: // Map
+                final Map<Object, Object> map;
+
+                try {
+                    map = (Map) object;
+                } catch (ClassCastException e) {
+                    throw new DataSourceError(e);
+                }
+
+                extractMap(resultSet, map::put, column, prefix, signature, signaturePointer);
+
+                break;
+
+            default:
+                throw new ShouldNotReachHere();
+        }
     }
 
     private static String[] valuesExceptKeys(DataObject dataObject)
@@ -685,21 +714,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     @Override
     public <T> boolean pull(T object, Class<T> type, Class<?>... signatured) throws DataSourceException
     {
-        int i = (List.class.isAssignableFrom(type) ? 0b001 : 0)
-                | (Set.class.isAssignableFrom(type) ? 0b010 : 0)
-                | (Map.class.isAssignableFrom(type) ? 0b100 : 0);
-
-        switch (i)
-        {
-            case 0b000:
-                throw new DataSourceException(type.getCanonicalName() + " is not a collection type");
-
-            case 0b011:
-            case 0b101:
-            case 0b110:
-            case 0b111:
-                throw vagueCollectionType();
-        }
+        int i = checkCollectionType(type);
 
         ResultSet resultSet;
         try {
@@ -711,43 +726,12 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             throw new DataSourceException(e);
         }
 
-        switch (i)
-        {
-            case 0b001: // List
-                final List<Object> list;
+        extractCollection(resultSet, i, object, null, Prefix.of(), signatured, new Increment());
 
-                try {
-                    list = (List) object;
-                } catch (ClassCastException e) {
-                    throw new DataSourceException(e);
-                }
-
-                extractList(resultSet, list::add, null, Prefix.of(), signatured, new Increment());
-                break;
-
-            case 0b010: // Set
-                final Set<Object> set;
-
-                try {
-                    set = (Set) object;
-                } catch (ClassCastException e) {
-                    throw new DataSourceException(e);
-                }
-
-                extractSet(resultSet, set::add, null, Prefix.of(), signatured, new Increment());
-                break;
-
-            case 0b100: // Map
-                final Map<Object, Object> map;
-
-                try {
-                    map = (Map) object;
-                } catch (ClassCastException e) {
-                    throw new DataSourceException(e);
-                }
-
-                extractMap(resultSet, map::put, null, Prefix.of(), signatured, new Increment());
-                break;
+        try {
+            resultSet.close();
+        } catch (SQLException e) {
+            throw new DataSourceException(e);
         }
 
         return true;
@@ -756,14 +740,51 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     @Override
     public <T, X extends Throwable> Collection<T> pull(Class<T> type, SupplierWithThrowable<T, X> constructor) throws DataSourceException
     {
-        return null;
+        Collection<T> collection = new ArrayList<>();
+
+        String[] values;
+        DataObject dataObject;
+        try {
+            dataObject = container.interpretIfAbsent(type, interpreter);
+
+            List<String> valueList = new ArrayList<>();
+            for (ValueObject valueObject : new ValueObjectIterator(dataObject))
+                valueList.add(valueObject.getName());
+
+            values = valueList.toArray(new String[valueList.size()]);
+        } catch (DataObjectInterpretationException e) {
+            throw new DataSourceException(e);
+        }
+
+        try {
+            ResultSet resultSet = manipulator.query(connection, tableName, null, values);
+
+            while (resultSet.next())
+            {
+                T object;
+                try {
+                    object = constructor.get();
+                } catch (Throwable e) {
+                    throw new DataSourceException("Object construction failure", e);
+                }
+
+                for (ValueObject valueObject : new ValueObjectIterator(dataObject))
+                    extract(resultSet, object, valueObject);
+            }
+        } catch (SQLException e) {
+            throw new DataSourceException(e);
+        }
+
+        return collection;
     }
 
     @Override
     public <T, X extends Throwable> Collection<T> pull(Class<T> type, SupplierWithThrowable<T, X> constructor, Class<?>... signatured)
             throws DataSourceException
     {
-        return null;
+        int i = checkCollectionType(type);
+
+        Collection<T> collection = new ArrayList<>();
     }
 
     @Override
@@ -968,6 +989,12 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     protected DataExtractorFactory extractorFactory;
 
     private static final Prefix MAP_VALUE_PREFIX = Prefix.of("V");
+
+    private static final int TYPE_LIST = 0b001;
+
+    private static final int TYPE_SET = 0b010;
+
+    private static final int TYPE_MAP = 0b100;
 
     private class TransactionImpl implements Transaction
     {
