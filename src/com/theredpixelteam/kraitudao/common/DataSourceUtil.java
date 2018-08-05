@@ -59,12 +59,6 @@ public final class DataSourceUtil {
         }
 
         @Override
-        public synchronized <T> boolean pull(T object, Class<T> type, Class<?>... signatured) throws DataSourceException
-        {
-            return this.object.pull(object, type, signatured);
-        }
-
-        @Override
         public synchronized <T> Collection<T> pull(Class<T> type) throws DataSourceException
         {
             return this.object.pull(type);
@@ -75,13 +69,6 @@ public final class DataSourceUtil {
                 throws DataSourceException
         {
             return this.object.pull(type, constructor);
-        }
-
-        @Override
-        public synchronized <T, X extends Throwable> Collection<T> pull(Class<T> type, SupplierWithThrowable<T, X> constructor, Class<?>... signatured)
-                throws DataSourceException
-        {
-            return this.object.pull(type, constructor, signatured);
         }
 
         @Override
