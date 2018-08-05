@@ -34,16 +34,12 @@ public interface DataSource {
 
     public <T> boolean pull(T object, Class<T> type) throws DataSourceException;
 
-    public <T> boolean pull(T object, Class<T> type, Class<?>... signatured) throws DataSourceException;
-
     public default <T> Collection<T> pull(Class<T> type) throws DataSourceException
     {
         return pull(type, type::newInstance);
     }
 
     public <T, X extends Throwable> Collection<T> pull(Class<T> type, SupplierWithThrowable<T, X> constructor) throws DataSourceException;
-
-    public <T, X extends Throwable> Collection<T> pull(Class<T> type, SupplierWithThrowable<T, X> constructor, Class<?>... signatured) throws DataSourceException;
 
     public default <T> Collection<T> pullVaguely(T object) throws DataSourceException
     {

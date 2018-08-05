@@ -644,10 +644,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             String[] values;
 
             if (dataObject instanceof ElementDataObject)
-            {
-                values = valuesExceptKeys(dataObject);
-                keys = null;
-            }
+                throw new DataSourceException("Element data object is not allowed in global scope");
             else if (dataObject instanceof UniqueDataObject)
             {
                 UniqueDataObject uniqueDataObject = (UniqueDataObject) dataObject;
@@ -712,32 +709,6 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     }
 
     @Override
-    public <T> boolean pull(T object, Class<T> type, Class<?>... signatured) throws DataSourceException
-    {
-        int i = checkCollectionType(type);
-
-        ResultSet resultSet;
-        try {
-            resultSet = manipulator.query(connection, tableName, null, null);
-
-            if (!resultSet.next())
-                return false;
-        } catch (SQLException e) {
-            throw new DataSourceException(e);
-        }
-
-        extractCollection(resultSet, i, object, null, Prefix.of(), signatured, new Increment());
-
-        try {
-            resultSet.close();
-        } catch (SQLException e) {
-            throw new DataSourceException(e);
-        }
-
-        return true;
-    }
-
-    @Override
     public <T, X extends Throwable> Collection<T> pull(Class<T> type, SupplierWithThrowable<T, X> constructor) throws DataSourceException
     {
         Collection<T> collection = new ArrayList<>();
@@ -776,15 +747,6 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         }
 
         return collection;
-    }
-
-    @Override
-    public <T, X extends Throwable> Collection<T> pull(Class<T> type, SupplierWithThrowable<T, X> constructor, Class<?>... signatured)
-            throws DataSourceException
-    {
-        int i = checkCollectionType(type);
-
-        Collection<T> collection = new ArrayList<>();
     }
 
     @Override
