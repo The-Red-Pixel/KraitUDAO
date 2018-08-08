@@ -628,6 +628,32 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         }
     }
 
+    private <T, X extends Throwable> void extractAll(ResultSet resultSet,
+                                                     DataObject dataObject,
+                                                     SupplierWithThrowable<T, X> constructor,
+                                                     Consumer<T> consumer)
+            throws DataSourceException
+    {
+        try {
+            while (resultSet.next())
+            {
+                T object;
+                try {
+                    object = constructor.get();
+                } catch (Throwable e) {
+                    throw new DataSourceException("Object construction failure", e);
+                }
+
+                for (ValueObject valueObject : new ValueObjectIterator(dataObject))
+                    extract(resultSet, object, valueObject);
+
+                consumer.accept(object);
+            }
+        } catch (SQLException e) {
+            throw new DataSourceException(e);
+        }
+    }
+
     private static String[] valuesExceptKeys(DataObject dataObject)
     {
         Set<String> valueSet = dataObject.getValues().keySet();
@@ -727,21 +753,8 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             throw new DataSourceException(e);
         }
 
-        try {
-            ResultSet resultSet = manipulator.query(connection, tableName, null, values);
-
-            while (resultSet.next())
-            {
-                T object;
-                try {
-                    object = constructor.get();
-                } catch (Throwable e) {
-                    throw new DataSourceException("Object construction failure", e);
-                }
-
-                for (ValueObject valueObject : new ValueObjectIterator(dataObject))
-                    extract(resultSet, object, valueObject);
-            }
+        try (ResultSet resultSet = manipulator.query(connection, tableName, null, values)) {
+            extractAll(resultSet, dataObject, constructor, collection::add);
         } catch (SQLException e) {
             throw new DataSourceException(e);
         }
@@ -753,7 +766,45 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     public <T, X extends Throwable> Collection<T> pullVaguely(T object, Class<T> type, SupplierWithThrowable<T, X> constructor)
             throws DataSourceException
     {
-        return null;
+        Collection<T> collection = new ArrayList<>();
+
+        String[] values;
+        Pair<String, DataArgument>[] keys;
+        DataObject dataObject;
+
+        try {
+            dataObject = container.interpretIfAbsent(type, interpreter);
+
+            if (!(dataObject instanceof MultipleDataObject))
+                throw new DataSourceException("Only multiple data object allowed in this scope");
+
+            List<Pair<String, DataArgument>> keyList = new ArrayList<>();
+            List<String> valueList = new ArrayList<>();
+
+            for (ValueObject valueObject : new ValueObjectIterator(dataObject))
+            {
+                Object value = valueObject.get(object);
+
+                if (!valueObject.isKey() || value == null)
+                    valueList.add(valueObject.getName());
+                else
+                    keyList.add(Pair.of(valueObject.getName(), argumentWrapper.wrap(value)
+                            .orElseThrow(() -> typeUnsupportedByArgumentWrapper(value.getClass()))));
+            }
+
+            keys = keyList.toArray(new Pair[keyList.size()]);
+            values = valueList.toArray(new String[valueList.size()]);
+        } catch (DataObjectInterpretationException e) {
+            throw new DataSourceException(e);
+        }
+
+        try (ResultSet resultSet = manipulator.query(connection, tableName, keys, values)) {
+            extractAll(resultSet, dataObject, constructor, collection::add);
+        } catch (SQLException e) {
+            throw new DataSourceException(e);
+        }
+
+        return collection;
     }
 
     @Override
