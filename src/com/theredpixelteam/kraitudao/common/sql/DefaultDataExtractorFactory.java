@@ -33,6 +33,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 public class DefaultDataExtractorFactory implements DataExtractorFactory {
     @Override
@@ -86,6 +87,7 @@ public class DefaultDataExtractorFactory implements DataExtractorFactory {
             put(double.class,       (r, n, i, u) -> u ? r.getDouble(i) : r.getDouble(n));
             put(String.class,       (r, n, i, u) -> u ? r.getNString(i) : r.getNString(n));
             put(BigDecimal.class,   (r, n, i, u) -> u ? r.getBigDecimal(i) : r.getBigDecimal(n));
+            put(UUID.class,         (r, n, i, u) -> UUID.fromString(u ? r.getString(i) : r.getString(n)));
         }
     };
 

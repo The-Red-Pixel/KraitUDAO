@@ -31,6 +31,7 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 public class DefaultDataArgumentWrapper implements DataArgumentWrapper {
     @Override
@@ -66,6 +67,7 @@ public class DefaultDataArgumentWrapper implements DataArgumentWrapper {
             put(double.class,       (p, i, v) -> p.setDouble(i, (Double) v));
             put(String.class,       (p, i, v) -> p.setNString(i, (String) v));
             put(BigDecimal.class,   (p, i, v) -> p.setBigDecimal(i, (BigDecimal) v));
+            put(UUID.class,         (p, i, v) -> p.setString(i, v.toString()));
         }
     };
 

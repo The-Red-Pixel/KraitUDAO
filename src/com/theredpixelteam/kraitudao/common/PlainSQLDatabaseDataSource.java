@@ -741,6 +741,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
         String[] values;
         DataObject dataObject;
+
         try {
             dataObject = container.interpretIfAbsent(type, interpreter);
 
@@ -809,13 +810,6 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
     @Override
     public <T> Transaction commit(Transaction transaction, T object, Class<T> type)
-            throws DataSourceException
-    {
-        return null;
-    }
-
-    @Override
-    public <T> Transaction commit(Transaction transaction, T object, Class<T> type, Class<?>... signatured)
             throws DataSourceException
     {
         return null;
