@@ -493,7 +493,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         {
             DataObject dataObject = container.interpretIfAbsent(dataType, interpreter);
 
-            if (!(dataObject instanceof ElementDataObject))
+            if (!DataObjectType.ELEMENT.equals(dataObject.getDataObjectType()))
                 throw new DataSourceException.UnsupportedValueType(dataType.getCanonicalName());
 
             ElementDataObject elementDataObject = (ElementDataObject) dataObject;
@@ -669,54 +669,61 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             Pair<String, DataArgument>[] keys;
             String[] values;
 
-            if (dataObject instanceof ElementDataObject)
-                throw new DataSourceException("Element data object is not allowed in global scope");
-            else if (dataObject instanceof UniqueDataObject)
+            DataObjectType dataObjectType = dataObject.getDataObjectType();
+            switch (dataObjectType)
             {
-                UniqueDataObject uniqueDataObject = (UniqueDataObject) dataObject;
-                ValueObject key = uniqueDataObject.getKey();
+                case ELEMENT:
+                    throw new DataSourceException("Element data object is not allowed in global scope");
 
-                Object keyValue = key.get(object);
+                case UNIQUE:
+                    UniqueDataObject uniqueDataObject = (UniqueDataObject) dataObject;
+                    ValueObject key = uniqueDataObject.getKey();
 
-                if (keyValue == null)
-                    throw new DataSourceException("(pull) Null key \"" + key.getName() + "\" in UniqueDataObject");
+                    Object keyValue = key.get(object);
 
-                values = valuesExceptKeys(dataObject);
-                keys = new Pair[] {Pair.of(key.getName(), argumentWrapper.wrap(keyValue)
+                    if (keyValue == null)
+                        throw new DataSourceException("(pull) Null key \"" + key.getName() + "\" in UniqueDataObject");
+
+                    values = valuesExceptKeys(dataObject);
+                    keys = new Pair[]{Pair.of(key.getName(), argumentWrapper.wrap(keyValue)
                             .orElseThrow(() -> typeUnsupportedByArgumentWrapper(key.getType())))};
+
+                    break;
+
+                case MULTIPLE:
+
+                    MultipleDataObject multipleDataObject = (MultipleDataObject) dataObject;
+                    ValueObject primaryKey = multipleDataObject.getPrimaryKey();
+                    Collection<ValueObject> secondaryKeys = multipleDataObject.getSecondaryKeys().values();
+
+                    List<Pair<String, DataArgument>> keyList = new ArrayList<>();
+
+                    Object primaryKeyValue = primaryKey.get(object);
+
+                    if (primaryKeyValue == null)
+                        throw new DataSourceException("(pull) Null primary key \"" + primaryKey.getName() + "\" in MultipleDataObject");
+
+                    keyList.add(Pair.of(primaryKey.getName(), argumentWrapper.wrap(primaryKeyValue)
+                            .orElseThrow(() -> typeUnsupportedByArgumentWrapper(primaryKey.getType()))));
+
+                    for (ValueObject secondaryKey : secondaryKeys) {
+                        Object secondaryKeyValue = secondaryKey.get(object);
+
+                        if (secondaryKeyValue == null)
+                            throw new DataSourceException("(pull) Null secondary key \"" + secondaryKey.getName() + "\" in MultipleDataObject");
+
+                        keyList.add(Pair.of(secondaryKey.getName(), argumentWrapper.wrap(secondaryKeyValue)
+                                .orElseThrow(() -> typeUnsupportedByArgumentWrapper(secondaryKey.getType()))));
+                    }
+
+                    values = valuesExceptKeys(dataObject);
+                    keys = keyList.toArray(new Pair[keyList.size()]);
+
+                    break;
+
+                default:
+                    throw new DataSourceError("Interpretation failure");
             }
-            else if (dataObject instanceof MultipleDataObject)
-            {
-                MultipleDataObject multipleDataObject = (MultipleDataObject) dataObject;
-                ValueObject primaryKey = multipleDataObject.getPrimaryKey();
-                Collection<ValueObject> secondaryKeys = multipleDataObject.getSecondaryKeys().values();
-
-                List<Pair<String, DataArgument>> keyList = new ArrayList<>();
-
-                Object primaryKeyValue = primaryKey.get(object);
-
-                if (primaryKeyValue == null)
-                    throw new DataSourceException("(pull) Null primary key \"" + primaryKey.getName() + "\" in MultipleDataObject");
-
-                keyList.add(Pair.of(primaryKey.getName(), argumentWrapper.wrap(primaryKeyValue)
-                        .orElseThrow(() -> typeUnsupportedByArgumentWrapper(primaryKey.getType()))));
-
-                for (ValueObject secondaryKey : secondaryKeys)
-                {
-                    Object secondaryKeyValue = secondaryKey.get(object);
-
-                    if (secondaryKeyValue == null)
-                        throw new DataSourceException("(pull) Null secondary key \"" + secondaryKey.getName() + "\" in MultipleDataObject");
-
-                    keyList.add(Pair.of(secondaryKey.getName(), argumentWrapper.wrap(secondaryKeyValue)
-                            .orElseThrow(() -> typeUnsupportedByArgumentWrapper(secondaryKey.getType()))));
-                }
-
-                values = valuesExceptKeys(dataObject);
-                keys = keyList.toArray(new Pair[keyList.size()]);
-            }
-            else
-                throw new DataSourceError("Interpretation failure");
 
             try (ResultSet resultSet = manipulator.query(connection, tableName, keys, values)) {
                 if (!resultSet.next())
@@ -808,10 +815,37 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         return collection;
     }
 
+    private void commit(Object object, ValueObject valueObject, List<Pair<String, DataArgument>> values)
+    {
+        switch (valueObject.getStructure())
+        {
+            case VALUE:
+
+                break;
+
+            case LIST:
+            case SET:
+            case MAP:
+
+                break;
+        }
+    }
+
     @Override
     public <T> Transaction commit(Transaction transaction, T object, Class<T> type)
             throws DataSourceException
     {
+        try {
+            DataObject dataObject = container.interpretIfAbsent(type, interpreter);
+
+            if (dataObject instanceof ElementDataObject)
+                throw new DataSourceException("Element data object is not allowed in global scope");
+
+
+        } catch (DataObjectInterpretationException e) {
+            throw new DataSourceException(e);
+        }
+
         return null;
     }
 

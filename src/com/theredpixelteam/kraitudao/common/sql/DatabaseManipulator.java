@@ -28,9 +28,18 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLType;
+import java.util.Collection;
 
 public interface DatabaseManipulator {
     public ResultSet query(Connection connection, String tableName, Pair<String, DataArgument>[] keys, String[] values)
+            throws SQLException;
+
+    public default Collection<String> queryTables(Connection connection) throws SQLException
+    {
+        return queryTables(connection, null);
+    }
+
+    public Collection<String> queryTables(Connection connection, String pattern)
             throws SQLException;
 
     public int delete(Connection connection, String tableName, Pair<String, DataArgument>[] keysAndValues)

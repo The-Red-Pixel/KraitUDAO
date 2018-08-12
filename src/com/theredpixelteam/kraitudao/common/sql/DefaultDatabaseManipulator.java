@@ -69,6 +69,12 @@ public class DefaultDatabaseManipulator implements DatabaseManipulator {
     }
 
     @Override
+    public Collection<String> queryTables(Connection connection, String pattern) throws SQLException
+    {
+        return null;
+    }
+
+    @Override
     public int delete(Connection connection, String tableName, Pair<String, DataArgument>[] keysAndValues)
             throws SQLException
     {
