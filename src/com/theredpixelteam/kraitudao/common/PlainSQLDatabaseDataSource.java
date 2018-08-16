@@ -89,7 +89,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                                       DataObjectContainer container)
             throws DataSourceException
     {
-        this(connection, tableName, interpreter, expander, container, DefaultDatabaseManipulator.INSTANCE);
+        this(connection, tableName, interpreter, expander, container, H2DatabaseManipulator.INSTANCE);
     }
 
     public PlainSQLDatabaseDataSource(Connection connection,
@@ -752,6 +752,9 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         try {
             dataObject = container.interpretIfAbsent(type, interpreter);
 
+            if (dataObject instanceof ElementDataObject)
+                throw new DataSourceException("Element data object is not allowed in global scope");
+
             List<String> valueList = new ArrayList<>();
             for (ValueObject valueObject : new ValueObjectIterator(dataObject))
                 valueList.add(valueObject.getName());
@@ -815,11 +818,23 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         return collection;
     }
 
-    private void commit(Object object, ValueObject valueObject, List<Pair<String, DataArgument>> values)
+    private void commit(Object object, ValueObject valueObject, List<Pair<String, DataArgument>> values, Prefix prefix)
     {
+        Class<?> valueType = valueObject.getType();
+
         switch (valueObject.getStructure())
         {
             case VALUE:
+                Object value = valueObject.get(object);
+
+                if (!manipulator.supportType(valueType))
+                {
+
+                }
+                else
+                {
+
+                }
 
                 break;
 
@@ -829,6 +844,11 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
                 break;
         }
+    }
+
+    private void commitValue()
+    {
+
     }
 
     @Override

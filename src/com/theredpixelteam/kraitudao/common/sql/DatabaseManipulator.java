@@ -54,6 +54,9 @@ public interface DatabaseManipulator {
     public boolean createTableIfNotExists(Connection connection, String tableName, Vector3<String, Class<?>, Constraint[]>[] columns, Constraint[] tableConstraints)
             throws SQLException;
 
+    public void cleanTable(Connection connection, String tableName)
+            throws SQLException;
+
     public void dropTable(Connection connection, String tableName)
             throws SQLException;
 
