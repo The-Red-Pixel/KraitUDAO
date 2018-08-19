@@ -35,21 +35,61 @@ public class ValueObjectIterator implements Iterator<ValueObject>, Iterable<Valu
         init();
     }
 
+    public ValueObjectIterator(ElementDataObject elementDataObject)
+    {
+        this.dataObject = elementDataObject;
+        initForElement();
+    }
+
+    public ValueObjectIterator(UniqueDataObject uniqueDataObject)
+    {
+        this.dataObject = uniqueDataObject;
+        initForUnqiue();
+    }
+
+    public ValueObjectIterator(MultipleDataObject multipleDataObject)
+    {
+        this.dataObject = multipleDataObject;
+        initForMultiple();
+    }
+
+    private void initForElement()
+    {
+        this.node = new Node(() -> dataObject.getValues().values().iterator());
+    }
+
+    private void initForUnqiue()
+    {
+        (this.node = new Node(() -> Collections.singleton(((UniqueDataObject) dataObject).getKey()).iterator()))
+                .append(() -> dataObject.getValues().values().iterator());
+    }
+
+    private void initForMultiple()
+    {
+        (this.node = new Node(() -> Collections.singleton(((MultipleDataObject) dataObject).getPrimaryKey()).iterator()))
+                .append(() -> ((MultipleDataObject) dataObject).getSecondaryKeys().values().iterator())
+                .append(() -> dataObject.getValues().values().iterator());
+    }
+
     private void init()
     {
-        if(dataObject instanceof ElementDataObject)
-            this.node = new Node(() -> dataObject.getValues().values().iterator());
-        else if(dataObject instanceof UniqueDataObject)
-            (this.node = new Node(() -> Collections.singleton(((UniqueDataObject) dataObject).getKey()).iterator()))
-                    .append(() -> dataObject.getValues().values().iterator());
-        else if(dataObject instanceof MultipleDataObject)
+        switch (dataObject.getDataObjectType())
         {
-            (this.node = new Node(() -> Collections.singleton(((MultipleDataObject) dataObject).getPrimaryKey()).iterator()))
-                    .append(() -> ((MultipleDataObject) dataObject).getSecondaryKeys().values().iterator())
-                    .append(() -> dataObject.getValues().values().iterator());
+            case ELEMENT:
+                initForElement();
+                break;
+
+            case UNIQUE:
+                initForUnqiue();
+                break;
+
+            case MULTIPLE:
+                initForMultiple();
+                break;
+
+            default:
+                throw new IllegalArgumentException("Unsupported data object");
         }
-        else
-            throw new IllegalArgumentException("Unsupported data object");
     }
 
     @Override

@@ -497,9 +497,10 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                 throw new DataSourceException.UnsupportedValueType(dataType.getCanonicalName());
 
             ElementDataObject elementDataObject = (ElementDataObject) dataObject;
+            Prefix nextPrefix = prefix.append(valueObject.getName());
 
             for (ValueObject elementValueObject : elementDataObject.getValues().values())
-                extract(resultSet, object, elementValueObject, prefix.append(valueObject.getName()), null, null);
+                extract(resultSet, object, elementValueObject, nextPrefix, null, null);
         } catch (DataObjectInterpretationException e) {
             throw new DataSourceException(e);
         }
@@ -508,8 +509,10 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             Map<String, ValueObject> expanded = container.expand(valueObject, expander)
                     .orElseThrow(() -> new DataSourceException.UnsupportedValueType(dataType.getCanonicalName()));
 
+            Prefix nextPrefix = prefix.append(valueObject.getName());
+
             for (ValueObject expandedValueObject : expanded.values())
-                extract(resultSet, object, expandedValueObject, prefix.append(valueObject.getName()), null, null);
+                extract(resultSet, object, expandedValueObject, nextPrefix, null, null);
         } catch (DataObjectInterpretationException e) {
             throw new DataSourceException(e);
         }
@@ -752,7 +755,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         try {
             dataObject = container.interpretIfAbsent(type, interpreter);
 
-            if (dataObject instanceof ElementDataObject)
+            if (DataObjectType.ELEMENT.equals(dataObject.getDataObjectType()))
                 throw new DataSourceException("Element data object is not allowed in global scope");
 
             List<String> valueList = new ArrayList<>();
@@ -786,7 +789,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         try {
             dataObject = container.interpretIfAbsent(type, interpreter);
 
-            if (!(dataObject instanceof MultipleDataObject))
+            if (!DataObjectType.MULTIPLE.equals(dataObject.getDataObjectType()))
                 throw new DataSourceException("Only multiple data object allowed in this scope");
 
             List<Pair<String, DataArgument>> keyList = new ArrayList<>();
@@ -819,23 +822,14 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     }
 
     private void commit(Object object, ValueObject valueObject, List<Pair<String, DataArgument>> values, Prefix prefix)
+            throws DataSourceException
     {
         Class<?> valueType = valueObject.getType();
 
         switch (valueObject.getStructure())
         {
             case VALUE:
-                Object value = valueObject.get(object);
-
-                if (!manipulator.supportType(valueType))
-                {
-
-                }
-                else
-                {
-
-                }
-
+                commitValue(object, valueObject, values, prefix);
                 break;
 
             case LIST:
@@ -846,9 +840,46 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         }
     }
 
-    private void commitValue()
+    private void commitValue(Object object, ValueObject valueObject, List<Pair<String, DataArgument>> values, Prefix prefix)
+            throws DataSourceException
     {
+        Class<?> type = valueObject.getType();
+        Object value = valueObject.get(object);
 
+        boolean supported = manipulator.supportType(type);
+        boolean expandForcibly = valueObject.hasMetadata(ExpandForcibly.class);
+
+        boolean elementAnnotated = type.getAnnotation(Element.class) != null;
+
+        boolean expanding = expandForcibly || supported;
+
+        if (elementAnnotated || expanding) try {
+            Iterable<ValueObject> iterable;
+
+            if (!expandForcibly && elementAnnotated)
+            {
+                DataObject dataObject = container.interpretIfAbsent(type, interpreter);
+
+                if (!DataObjectType.ELEMENT.equals(dataObject.getDataObjectType()))
+                    throw typeUnsupportedByArgumentWrapper(type);
+
+                iterable = new ValueObjectIterator((ElementDataObject) dataObject);
+            }
+            else
+                iterable = container.expand(valueObject, expander)
+                        .orElseThrow(() -> typeUnsupportedByArgumentWrapper(type))
+                        .values();
+
+            Prefix nextPrefix = prefix.append(valueObject.getName());
+
+            for (ValueObject expandedValueObject : iterable)
+                commit(value, expandedValueObject, values, nextPrefix);
+        } catch (DataObjectInterpretationException e) {
+            throw new DataSourceException(e);
+        }
+        else
+            values.add(Pair.of(prefix.apply(valueObject.getName()), argumentWrapper.wrap(valueObject)
+                    .orElseThrow(() -> typeUnsupportedByArgumentWrapper(type))));
     }
 
     @Override
