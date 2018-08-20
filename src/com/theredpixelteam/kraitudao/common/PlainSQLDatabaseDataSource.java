@@ -777,6 +777,13 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     }
 
     @Override
+    public <T, X extends Throwable> T pull(Class<T> type, SupplierWithThrowable<T, X> constructor, Class<?>... signatures)
+            throws DataSourceException
+    {
+        return null;
+    }
+
+    @Override
     public <T, X extends Throwable> Collection<T> pullVaguely(T object, Class<T> type, SupplierWithThrowable<T, X> constructor)
             throws DataSourceException
     {
@@ -897,6 +904,13 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             throw new DataSourceException(e);
         }
 
+        return null;
+    }
+
+    @Override
+    public <T> Transaction commit(Transaction transaction, T object, Class<T> type, Class<?>... signatures)
+            throws DataSourceException
+    {
         return null;
     }
 

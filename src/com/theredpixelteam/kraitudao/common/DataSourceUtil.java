@@ -72,6 +72,25 @@ public final class DataSourceUtil {
         }
 
         @Override
+        public <T, X extends Throwable> T pull(Class<T> type, SupplierWithThrowable<T, X> constructor, Class<?>... signatures)
+                throws DataSourceException
+        {
+            return this.object.pull(type, constructor, signatures);
+        }
+
+        @Override
+        public <T> T pull(Class<T> type, T object, Class<?>... signatures) throws DataSourceException
+        {
+            return this.object.pull(type, object, signatures);
+        }
+
+        @Override
+        public <T> T pull(Class<T> type, Class<?>... signatures) throws DataSourceException
+        {
+            return this.object.pull(type, signatures);
+        }
+
+        @Override
         public synchronized <T> Collection<T> pullVaguely(T object)
                 throws DataSourceException
         {
@@ -123,21 +142,21 @@ public final class DataSourceUtil {
         }
 
         @Override
-        public synchronized <T> Transaction commit(T object, Class<T> type, Class<?>... signatured) throws DataSourceException
-        {
-            return this.object.commit(object, type, signatured);
-        }
-
-        @Override
         public synchronized <T> void commitInstantly(T object, Class<T> type) throws DataSourceException
         {
             this.object.commitInstantly(object, type);
         }
 
         @Override
-        public synchronized <T> void commitInstantly(T object, Class<T> type, Class<?>... signatured) throws DataSourceException
+        public <T> Transaction commit(T object, Class<T> type, Class<?>... signatures) throws DataSourceException
         {
-            this.object.commitInstantly(object, type, signatured);
+            return this.object.commit(object, type, signatures);
+        }
+
+        @Override
+        public <T> void commitInstantly(T object, Class<T> type, Class<?>... signatures) throws DataSourceException
+        {
+            this.object.commitInstantly(object, type, signatures);
         }
 
         @Override
@@ -148,16 +167,23 @@ public final class DataSourceUtil {
         }
 
         @Override
-        public synchronized <T> Transaction commit(Transaction transaction, T object, Class<T> type, Class<?>... signatured)
-                throws DataSourceException
-        {
-            return this.object.commit(transaction, object, type, signatured);
-        }
-
-        @Override
         public synchronized <T> void commitInstantly(Transaction transaction, T object, Class<T> type) throws DataSourceException
         {
             this.object.commitInstantly(transaction, object, type);
+        }
+
+        @Override
+        public <T> Transaction commit(Transaction transaction, T object, Class<T> type, Class<?>... signatures)
+                throws DataSourceException
+        {
+            return this.object.commit(transaction, object, type, signatures);
+        }
+
+        @Override
+        public <T> void commitInstantly(Transaction transaction, T object, Class<T> type, Class<?>... signatures)
+                throws DataSourceException
+        {
+            this.object.commitInstantly(transaction, object, type, signatures);
         }
 
         @Override

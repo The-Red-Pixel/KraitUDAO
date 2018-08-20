@@ -21,6 +21,7 @@
 
 package com.theredpixelteam.kraitudao;
 
+import com.theredpixelteam.redtea.function.Supplier;
 import com.theredpixelteam.redtea.function.SupplierWithThrowable;
 
 import java.util.Collection;
@@ -40,6 +41,18 @@ public interface DataSource {
     }
 
     public <T, X extends Throwable> Collection<T> pull(Class<T> type, SupplierWithThrowable<T, X> constructor) throws DataSourceException;
+
+    public <T, X extends Throwable> T pull(Class<T> type, SupplierWithThrowable<T, X> constructor, Class<?>... signatures) throws DataSourceException;
+
+    public default <T> T pull(Class<T> type, T object, Class<?>... signatures) throws DataSourceException
+    {
+        return pull(type, (Supplier<T>) () -> object, signatures);
+    }
+
+    public default <T> T pull(Class<T> type, Class<?>... signatures) throws DataSourceException
+    {
+        return pull(type, (SupplierWithThrowable<T, ?>) type::newInstance, signatures);
+    }
 
     public default <T> Collection<T> pullVaguely(T object) throws DataSourceException
     {
@@ -83,11 +96,28 @@ public interface DataSource {
         commit(object, type).push();
     }
 
+    public default <T> Transaction commit(T object, Class<T> type, Class<?>... signatures) throws DataSourceException
+    {
+        return commit(null, object, type, signatures);
+    }
+
+    public default <T> void commitInstantly(T object, Class<T> type, Class<?>... signatures) throws DataSourceException
+    {
+        commit(object, type, signatures).push();
+    }
+
     public <T> Transaction commit(Transaction transaction, T object, Class<T> type) throws DataSourceException;
 
     public default <T> void commitInstantly(Transaction transaction, T object, Class<T> type) throws DataSourceException
     {
         commit(transaction, object, type).push();
+    }
+
+    public <T> Transaction commit(Transaction transaction, T object, Class<T> type, Class<?>... signatures) throws DataSourceException;
+
+    public default <T> void commitInstantly(Transaction transaction, T object, Class<T> type, Class<?>... signatures) throws DataSourceException
+    {
+        commit(transaction, object, type, signatures).push();
     }
 
     public default <T> Transaction remove(T object) throws DataSourceException
