@@ -448,7 +448,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                     }
 
                     for (ValueObject elementValueObject : elementDataObject.getValues().values())
-                        extract(resultSet, listElementObject, elementValueObject, Prefix.of(), signature, signaturePointer);
+                        extract(resultSet, listElementObject, elementValueObject, LIST_ELEMENT_PREFIX, signature, signaturePointer);
                 }
                 else
                     listElementObject = (E) extractRaw(resultSet, listElementType, "E", Prefix.of(), signature, signaturePointer);
@@ -780,7 +780,22 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     public <T, X extends Throwable> T pull(Class<T> type, SupplierWithThrowable<T, X> constructor, Class<?>... signatures)
             throws DataSourceException
     {
-        return null;
+        int i = checkCollectionType(type);
+
+        T object;
+        try {
+            object = constructor.get();
+        } catch (Throwable e) {
+            throw new DataSourceException(e);
+        }
+
+        try (ResultSet resultSet = manipulator.query(connection, tableName, null, null)) {
+            extractCollection(resultSet, i, object, null, Prefix.of(), signatures, new Increment());
+        } catch (SQLException e) {
+            throw new DataSourceException(e);
+        }
+
+        return object;
     }
 
     @Override
@@ -845,6 +860,11 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
                 break;
         }
+    }
+
+    private void commitList(Object object, List<Pair<String, DataArgument>>)
+    {
+
     }
 
     private void commitValue(Object object, ValueObject valueObject, List<Pair<String, DataArgument>> values, Prefix prefix)
@@ -1095,6 +1115,8 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     protected DataExtractorFactory extractorFactory;
 
     private static final Prefix MAP_VALUE_PREFIX = Prefix.of("V");
+
+    private static final Prefix LIST_ELEMENT_PREFIX = Prefix.of("E");
 
     private static final int TYPE_LIST = 0b001;
 
