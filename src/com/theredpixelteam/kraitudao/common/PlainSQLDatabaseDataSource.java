@@ -311,7 +311,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
             if (column != null)
             {
-                String mapTableIdentity = (String) extractorFactory.create(String.class, prefix.apply(column))
+                String mapTableIdentity = (String) extractorFactory.create(String.class, asCollectionColumnName(prefix.apply(column)))
                         .orElseThrow(() -> typeUnsupportedByExtractor(String.class))
                         .extract(resultSet);
 
@@ -377,7 +377,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
             if (column != null)
             {
-                String setTableIdentity = (String) extractorFactory.create(String.class, prefix.apply(column))
+                String setTableIdentity = (String) extractorFactory.create(String.class, asCollectionColumnName(prefix.apply(column)))
                         .orElseThrow(() -> typeUnsupportedByExtractor(String.class))
                         .extract(resultSet);
 
@@ -413,7 +413,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
             if (column != null)
             {
-                String listTableIdentity = (String) extractorFactory.create(String.class, prefix.apply(column))
+                String listTableIdentity = (String) extractorFactory.create(String.class, asCollectionColumnName(prefix.apply(column)))
                         .orElseThrow(() -> typeUnsupportedByExtractor(String.class))
                         .extract(resultSet);
 
@@ -660,7 +660,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     private static String[] valuesExceptKeys(DataObject dataObject)
     {
         Set<String> valueSet = dataObject.getValues().keySet();
-        return valueSet.toArray(new String[valueSet.size()]);
+        return valueSet.toArray(new String[0]);
     }
 
     @Override
@@ -720,7 +720,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                     }
 
                     values = valuesExceptKeys(dataObject);
-                    keys = keyList.toArray(new Pair[keyList.size()]);
+                    keys = keyList.toArray(new Pair[0]);
 
                     break;
 
@@ -762,7 +762,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             for (ValueObject valueObject : new ValueObjectIterator(dataObject))
                 valueList.add(valueObject.getName());
 
-            values = valueList.toArray(new String[valueList.size()]);
+            values = valueList.toArray(new String[0]);
         } catch (DataObjectInterpretationException e) {
             throw new DataSourceException(e);
         }
@@ -828,8 +828,8 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                             .orElseThrow(() -> typeUnsupportedByArgumentWrapper(value.getClass()))));
             }
 
-            keys = keyList.toArray(new Pair[keyList.size()]);
-            values = valueList.toArray(new String[valueList.size()]);
+            keys = keyList.toArray(new Pair[0]);
+            values = valueList.toArray(new String[0]);
         } catch (DataObjectInterpretationException e) {
             throw new DataSourceException(e);
         }
@@ -841,6 +841,20 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         }
 
         return collection;
+    }
+
+    private void cleanupCollection(String identity) throws DataSourceException
+    {
+        try (ResultSet resultSet = manipulator.queryTop(connection, tableName, null, null, 1)) {
+
+        } catch (SQLException e) {
+
+        }
+    }
+
+    private void stepoverCollections(String identity, List<String> collections)
+    {
+
     }
 
     private void commit(Object object, ValueObject valueObject, List<Pair<String, DataArgument>> values, Prefix prefix)
@@ -862,10 +876,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         }
     }
 
-    private void commitList(Object object, List<Pair<String, DataArgument>>)
-    {
 
-    }
 
     private void commitValue(Object object, ValueObject valueObject, List<Pair<String, DataArgument>> values, Prefix prefix)
             throws DataSourceException
@@ -1037,8 +1048,8 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                 tableConstraints.add(Constraint.ofPrimaryKey(keyNames));
             }
 
-            Constraint[] tableConstraintArray = tableConstraints.toArray(new Constraint[tableConstraints.size()]);
-            Vector3<String, Class<?>, Constraint[]>[] columnArray = columns.toArray(new Vector3[columns.size()]);
+            Constraint[] tableConstraintArray = tableConstraints.toArray(new Constraint[0]);
+            Vector3<String, Class<?>, Constraint[]>[] columnArray = columns.toArray(new Vector3[0]);
 
             if(ifNotExists)
                 return manipulator.createTableIfNotExists(connection, tableName, columnArray, tableConstraintArray);
@@ -1094,6 +1105,11 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     private String asCollectionTableName(String identity)
     {
         return tableName + "_XXSYNTHETIC_COLLECTION_" + identity;
+    }
+
+    private String asCollectionColumnName(String column)
+    {
+        return column + "_XXTAG_COLLECTION";
     }
 
     private volatile Transaction currentTransaction;

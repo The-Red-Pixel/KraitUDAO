@@ -34,6 +34,9 @@ public interface DatabaseManipulator {
     public ResultSet query(Connection connection, String tableName, Pair<String, DataArgument>[] keys, String[] values)
             throws SQLException;
 
+    public ResultSet queryTop(Connection connection, String tableName, Pair<String, DataArgument>[] keys, String values[], int limit)
+            throws SQLException;
+
     public default Collection<String> queryTables(Connection connection) throws SQLException
     {
         return queryTables(connection, null);
@@ -54,13 +57,13 @@ public interface DatabaseManipulator {
     public boolean createTableIfNotExists(Connection connection, String tableName, Vector3<String, Class<?>, Constraint[]>[] columns, Constraint[] tableConstraints)
             throws SQLException;
 
-    public void cleanTable(Connection connection, String tableName)
+    public void cleanTable(Connection connection, String... tableNames)
             throws SQLException;
 
-    public void dropTable(Connection connection, String tableName)
+    public void dropTable(Connection connection, String... tableNames)
             throws SQLException;
 
-    public boolean dropTableIfExists(Connection connection, String tableName)
+    public boolean dropTableIfExists(Connection connection, String... tableNames)
             throws SQLException;
 
     public boolean supportType(Class<?> type);

@@ -58,8 +58,22 @@ public class H2DatabaseManipulator implements DatabaseManipulator {
     public ResultSet query(Connection connection, String tableName, Pair<String, DataArgument>[] keys, String[] values)
             throws SQLException
     {
+        return query0(connection, tableName, keys, values, false, 0);
+
+    }
+
+    @Override
+    public ResultSet queryTop(Connection connection, String tableName, Pair<String, DataArgument>[] keys, String[] values, int limit)
+            throws SQLException
+    {
+        return query0(connection, tableName, keys, values, true, limit);
+    }
+
+    private ResultSet query0(Connection connection, String tableName, Pair<String, DataArgument>[] keys, String[] values, boolean top, int limit)
+            throws SQLException
+    {
         PreparedStatement preparedStatement = connection.prepareStatement(
-                "SELECT " + combine(values, ",", "*") +
+                "SELECT " + (top ? ("TOP " + limit + " ") : "") + combine(values, ",", "*") +
                         " FROM " + tableName + " WHERE " + narrow(keys)
         );
 
@@ -140,13 +154,17 @@ public class H2DatabaseManipulator implements DatabaseManipulator {
     }
 
     @Override
-    public void cleanTable(Connection connection, String tableName) throws SQLException
+    public void cleanTable(Connection connection, String... tableNames) throws SQLException
     {
-        PreparedStatement preparedStatement = connection.prepareStatement("DELETE FROM " + tableName);
+        Statement statement = connection.createStatement();
 
-        preparedStatement.executeUpdate();
+        for(int i = 0; i < tableNames.length; i++)
+            statement.addBatch("DELETE FROM " + tableNames[i]);
 
-        preparedStatement.close();
+        statement.executeBatch();
+
+        statement.clearBatch();
+        statement.close();
     }
 
     private boolean createTable0(Connection connection, String tableName, Vector3<String, Class<?>, Constraint[]>[] columns, Constraint[] tableConstraints, boolean onNotExists)
@@ -168,13 +186,13 @@ public class H2DatabaseManipulator implements DatabaseManipulator {
     }
 
     @Override
-    public void dropTable(Connection connection, String tableName) throws SQLException
+    public void dropTable(Connection connection, String... tableName) throws SQLException
     {
         dropTable0(connection, tableName, false);
     }
 
     @Override
-    public boolean dropTableIfExists(Connection connection, String tableName) throws SQLException
+    public boolean dropTableIfExists(Connection connection, String... tableName) throws SQLException
     {
         return dropTable0(connection, tableName, true);
     }
@@ -185,17 +203,25 @@ public class H2DatabaseManipulator implements DatabaseManipulator {
         return dataTypeParser.supportType(type);
     }
 
-    private boolean dropTable0(Connection connection, String tableName, boolean onExists) throws SQLException
+    private boolean dropTable0(Connection connection, String[] tableNames, boolean onExists) throws SQLException
     {
-        PreparedStatement preparedStatement = connection.prepareStatement(
-                "DROP TABLE " + (onExists ? "IF EXISTS " : "") + tableName
-        );
+        Statement statement = connection.createStatement();
 
-        int n = preparedStatement.executeUpdate();
+        for (int i = 0; i < tableNames.length; i++)
+            statement.addBatch(
+                    "DROP TABLE " + (onExists ? "IF EXISTS " : "") + tableNames[i]
+            );
 
-        preparedStatement.close();
+        int[] n = statement.executeBatch();
 
-        return n != 0;
+        statement.clearBatch();
+        statement.close();
+
+        for(int nx : n)
+            if (nx != 0)
+                return true;
+
+        return false;
     }
 
     public ConstraintParser getConstraintParser()
