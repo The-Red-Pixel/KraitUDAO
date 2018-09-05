@@ -40,6 +40,7 @@ import com.theredpixelteam.redtea.util.concurrent.Increment;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.*;
 
@@ -845,16 +846,56 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
     private void cleanupCollection(String identity) throws DataSourceException
     {
-        try (ResultSet resultSet = manipulator.queryTop(connection, tableName, null, null, 1)) {
+        List<String> collections = new ArrayList<>();
 
+        stepintoCollections(identity == null ? tableName : asCollectionTableName(identity), collections);
+
+        try {
+            manipulator.cleanTable(connection, collections.toArray(new String[0]));
         } catch (SQLException e) {
-
+            throw new DataSourceException("Cleanup", e);
         }
     }
 
-    private void stepoverCollections(String identity, List<String> collections)
+    private void stepintoCollections(String root, List<String> collections) throws DataSourceException
     {
+        List<String> collectionColumns = new ArrayList<>();
 
+        try (ResultSet resultSet = manipulator.queryTop(connection, root, null, null, 1)) {
+            if (!resultSet.next())
+                return;
+
+            ResultSetMetaData metadata = resultSet.getMetaData();
+            int count = metadata.getColumnCount();
+
+            for (int i = 0; i < count;)
+            {
+                String name = metadata.getColumnName(++i);
+
+                if (isCollectionColumnName(name))
+                    collectionColumns.add(name);
+            }
+        } catch (SQLException e) {
+            throw new DataSourceException("Prequery", e);
+        }
+
+        if (collectionColumns.isEmpty())
+            return;
+
+        try (ResultSet resultSet = manipulator.query(connection, root, null, collectionColumns.toArray(new String[0]))) {
+            while (resultSet.next())
+                for (String column : collectionColumns)
+                {
+                    String id = resultSet.getString(column);
+
+                    if (id != null)
+                        cleanupCollection(id);
+                }
+
+            collections.add(root);
+        } catch (SQLException e) {
+            throw new DataSourceException("Query", e);
+        }
     }
 
     private void commit(Object object, ValueObject valueObject, List<Pair<String, DataArgument>> values, Prefix prefix)
@@ -1104,12 +1145,17 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
     private String asCollectionTableName(String identity)
     {
-        return tableName + "_XXSYNTHETIC_COLLECTION_" + identity;
+        return tableName + COLLECTION_TABLE_SUFFIX + identity;
     }
 
-    private String asCollectionColumnName(String column)
+    private static String asCollectionColumnName(String column)
     {
-        return column + "_XXTAG_COLLECTION";
+        return column + COLLECTION_COLUMN_SUFFIX;
+    }
+
+    private static boolean isCollectionColumnName(String column)
+    {
+        return column.endsWith(COLLECTION_COLUMN_SUFFIX);
     }
 
     private volatile Transaction currentTransaction;
@@ -1129,6 +1175,10 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     protected DataArgumentWrapper argumentWrapper;
 
     protected DataExtractorFactory extractorFactory;
+
+    private static final String COLLECTION_TABLE_SUFFIX = "_XXSYNTHETIC_COLLECTION_TABLE_";
+
+    private static final String COLLECTION_COLUMN_SUFFIX = "_XXSYNTHETIC_TAG_COLLECTION";
 
     private static final Prefix MAP_VALUE_PREFIX = Prefix.of("V");
 
