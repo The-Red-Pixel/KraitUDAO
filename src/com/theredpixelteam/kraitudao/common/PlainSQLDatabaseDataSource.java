@@ -850,6 +850,9 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
         stepintoCollections(identity == null ? tableName : asCollectionTableName(identity), collections);
 
+        if (collections.isEmpty())
+            return;
+
         try {
             manipulator.cleanTable(connection, collections.toArray(new String[0]));
         } catch (SQLException e) {

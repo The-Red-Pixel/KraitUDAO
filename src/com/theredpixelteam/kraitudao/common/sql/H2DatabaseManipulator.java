@@ -156,6 +156,9 @@ public class H2DatabaseManipulator implements DatabaseManipulator {
     @Override
     public void cleanTable(Connection connection, String... tableNames) throws SQLException
     {
+        if (tableNames.length == 0)
+            return;
+
         Statement statement = connection.createStatement();
 
         for(int i = 0; i < tableNames.length; i++)
@@ -205,6 +208,9 @@ public class H2DatabaseManipulator implements DatabaseManipulator {
 
     private boolean dropTable0(Connection connection, String[] tableNames, boolean onExists) throws SQLException
     {
+        if (tableNames.length == 0)
+            return false;
+
         Statement statement = connection.createStatement();
 
         for (int i = 0; i < tableNames.length; i++)
@@ -217,7 +223,7 @@ public class H2DatabaseManipulator implements DatabaseManipulator {
         statement.clearBatch();
         statement.close();
 
-        for(int nx : n)
+        for (int nx : n)
             if (nx != 0)
                 return true;
 
