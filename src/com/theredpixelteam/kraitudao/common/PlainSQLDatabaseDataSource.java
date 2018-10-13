@@ -920,7 +920,21 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         }
     }
 
+    private void commitList(Object object, ValueObject valueObject, List<Pair<String, DataArgument>> values, Prefix prefix)
+            throws DataSourceException
+    {
+        String identity = prefix.apply(valueObject.getName());
+        String column = asCollectionColumnName(valueObject.getName());
 
+        cleanupCollection(identity);
+
+        String collectionTable = generateCollectionIdentity(tableName);
+
+        values.add(Pair.of(column, argumentWrapper.wrap(collectionTable)
+                .orElseThrow(() -> typeUnsupportedByArgumentWrapper(String.class))));
+
+
+    }
 
     private void commitValue(Object object, ValueObject valueObject, List<Pair<String, DataArgument>> values, Prefix prefix)
             throws DataSourceException
@@ -960,8 +974,13 @@ public class PlainSQLDatabaseDataSource implements DataSource {
             throw new DataSourceException(e);
         }
         else
-            values.add(Pair.of(prefix.apply(valueObject.getName()), argumentWrapper.wrap(valueObject)
+        {
+            // TODO check
+
+
+            values.add(Pair.of(prefix.apply(valueObject.getName()), argumentWrapper.wrap(value)
                     .orElseThrow(() -> typeUnsupportedByArgumentWrapper(type))));
+        }
     }
 
     @Override
@@ -1159,6 +1178,12 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     private static boolean isCollectionColumnName(String column)
     {
         return column.endsWith(COLLECTION_COLUMN_SUFFIX);
+    }
+
+    private static String generateCollectionIdentity(String tableName)
+    {
+        UUID uuid = UUID.randomUUID();
+        return tableName + "_" + uuid.toString().replace('-', '_');
     }
 
     private volatile Transaction currentTransaction;
