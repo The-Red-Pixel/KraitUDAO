@@ -934,6 +934,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
                 .orElseThrow(() -> typeUnsupportedByArgumentWrapper(String.class))));
 
 
+        // TODO
     }
 
     private void commitValue(Object object, ValueObject valueObject, List<Pair<String, DataArgument>> values, Prefix prefix)
@@ -975,8 +976,11 @@ public class PlainSQLDatabaseDataSource implements DataSource {
         }
         else
         {
-            // TODO check
-
+            if (value == null)
+                if (valueObject.isKey())
+                    throw new DataSourceException("Key cannot be null");
+                else if (valueObject.isNotNull())
+                    throw new DataSourceException("@NotNull declared but null value presented");
 
             values.add(Pair.of(prefix.apply(valueObject.getName()), argumentWrapper.wrap(value)
                     .orElseThrow(() -> typeUnsupportedByArgumentWrapper(type))));

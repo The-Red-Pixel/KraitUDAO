@@ -21,6 +21,7 @@
 
 package com.theredpixelteam.kraitudao.dataobject;
 
+import com.theredpixelteam.kraitudao.annotations.metadata.common.NotNull;
 import com.theredpixelteam.redtea.util.Optional;
 import com.theredpixelteam.redtea.util.ThreeStateOptional;
 
@@ -44,6 +45,11 @@ public interface ValueObject extends Metadatable, Constructable {
     public default boolean isKey()
     {
         return isPrimaryKey() || isSecondaryKey();
+    }
+
+    public default boolean isNotNull()
+    {
+        return hasMetadata(NotNull.class);
     }
 
     public boolean isPrimaryKey();
