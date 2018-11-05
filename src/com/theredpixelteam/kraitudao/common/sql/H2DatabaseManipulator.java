@@ -59,7 +59,6 @@ public class H2DatabaseManipulator implements DatabaseManipulator {
             throws SQLException
     {
         return query0(connection, tableName, keys, values, false, 0);
-
     }
 
     @Override

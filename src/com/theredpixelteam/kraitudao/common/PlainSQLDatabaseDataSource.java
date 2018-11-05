@@ -923,17 +923,18 @@ public class PlainSQLDatabaseDataSource implements DataSource {
     private void commitList(Object object, ValueObject valueObject, List<Pair<String, DataArgument>> values, Prefix prefix)
             throws DataSourceException
     {
-        String identity = prefix.apply(valueObject.getName());
+        String rootIdentity = prefix.apply(valueObject.getName());
         String column = asCollectionColumnName(valueObject.getName());
 
-        cleanupCollection(identity);
+        cleanupCollection(rootIdentity);
 
-        String collectionTable = generateCollectionIdentity(tableName);
+        String collectionIdentity = generateCollectionIdentity(tableName);
+        String collectionTable = asCollectionTableName(collectionIdentity);
 
-        values.add(Pair.of(column, argumentWrapper.wrap(collectionTable)
+        values.add(Pair.of(column, argumentWrapper.wrap(collectionIdentity)
                 .orElseThrow(() -> typeUnsupportedByArgumentWrapper(String.class))));
 
-
+//        manipulator.createTable(connection, collectionIdentity);
         // TODO
     }
 
@@ -1186,8 +1187,7 @@ public class PlainSQLDatabaseDataSource implements DataSource {
 
     private static String generateCollectionIdentity(String tableName)
     {
-        UUID uuid = UUID.randomUUID();
-        return tableName + "_" + uuid.toString().replace('-', '_');
+        return UUID.randomUUID().toString().replace('-', '_');
     }
 
     private volatile Transaction currentTransaction;
