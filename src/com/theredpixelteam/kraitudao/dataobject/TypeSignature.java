@@ -162,7 +162,7 @@ public class TypeSignature {
 
         Builder(Builder parent)
         {
-            this.parent = null;
+            this.parent = parent;
         }
 
         public TypeSignature build()
@@ -219,6 +219,12 @@ public class TypeSignature {
         public Builder appendExplicit(Class<?> rawType)
         {
             return appendFurther().rawType(rawType);
+        }
+
+        public Builder appendRawExplicit(Class<?> type)
+        {
+            appendFurther().rawType(type);
+            return this;
         }
 
         public Builder appendVariable(String name)
