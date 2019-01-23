@@ -23,25 +23,34 @@ package com.theredpixelteam.kraitudao.dataobject;
 
 import com.theredpixelteam.redtea.util.Optional;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.lang.reflect.*;
+import java.util.*;
 
-public class TypeSignature {
-    TypeSignature(Class<?> type, String name, TypeSignature[] signatures)
+public final class TypeSignature {
+    TypeSignature(Class<?> type,
+                  String name,
+                  int dimension,
+                  TypeSignature[] upperBounds,
+                  TypeSignature[] lowerBounds,
+                  TypeSignature[] signatures)
     {
-        this(null, type, name, signatures);
+        this(null, type, name, dimension, upperBounds, lowerBounds, signatures);
     }
 
-    TypeSignature(TypeSignature parent, Class<?> type, String name, TypeSignature[] signatures)
+    TypeSignature(TypeSignature parent,
+                  Class<?> type,
+                  String name,
+                  int dimension,
+                  TypeSignature[] upperBounds,
+                  TypeSignature[] lowerBounds,
+                  TypeSignature[] signatures)
     {
         this.parent = parent;
         this.type = type;
         this.name = name;
+        this.dimension = dimension;
+        this.upperBounds = upperBounds;
+        this.lowerBounds = lowerBounds;
         this.signatures = signatures == null ? EMPTY : signatures;
     }
 
@@ -70,6 +79,11 @@ public class TypeSignature {
         return Optional.ofNullable(name);
     }
 
+    public int getDimension()
+    {
+        return dimension;
+    }
+
     public boolean hasName()
     {
         return name != null;
@@ -90,6 +104,11 @@ public class TypeSignature {
         return type == null && name != null;
     }
 
+    public boolean isArray()
+    {
+        return dimension != 0;
+    }
+
     public TypeSignature[] getFurther()
     {
         return Arrays.copyOf(signatures, signatures.length);
@@ -98,6 +117,22 @@ public class TypeSignature {
     public boolean hasFurther()
     {
         return signatures.length != 0;
+    }
+
+    public static TypeSignature of(Type type)
+    {
+        // TODO
+        return null;
+    }
+
+    public static TypeSignature[] of(Type[] type)
+    {
+        TypeSignature[] arr = new TypeSignature[type.length];
+
+        for (int i = 0; i < type.length; i++)
+            arr[i] = of(type[i]);
+
+        return arr;
     }
 
     @Override
@@ -120,6 +155,9 @@ public class TypeSignature {
             buff.append(signatures[i].toString()).append(", ");
         buff.append(signatures[signatures.length - 1].toString()).append(">");
 
+        for (int i = 0; i < dimension; i++)
+            buff.append("[]");
+
         return buff.toString();
     }
 
@@ -135,12 +173,32 @@ public class TypeSignature {
 
     public static TypeSignature wildcard()
     {
-        return new TypeSignature(null, null, null);
+        return new TypeSignature(null, null, 0, EMPTY, EMPTY, null);
+    }
+
+    public static TypeSignature upperBoundedWildcard(Type... upperBounds)
+    {
+        return boundedWildcard(upperBounds, EMPTY_TYPES);
+    }
+
+    public static TypeSignature lowerBoundedWilcard(Type... lowerBounds)
+    {
+        return boundedWildcard(EMPTY_TYPES, lowerBounds);
+    }
+
+    public static TypeSignature boundedWildcard(Type[] upperBounds, Type[] lowerBounds)
+    {
+        return new TypeSignature(null, null, 0, of(upperBounds), of(lowerBounds), null);
     }
 
     public static TypeSignature variable(String name)
     {
-        return new TypeSignature(null, name, null);
+        return new TypeSignature(null, name, 0, EMPTY, EMPTY, null);
+    }
+
+    public static TypeSignature boundedVariable(String name, Type... upperBounds)
+    {
+        return new TypeSignature(null, name, 0, of(upperBounds), EMPTY, null);
     }
 
     private final TypeSignature parent;
@@ -149,9 +207,17 @@ public class TypeSignature {
 
     private final Class<?> type;
 
+    private final int dimension;
+
+    private final TypeSignature[] upperBounds;
+
+    private final TypeSignature[] lowerBounds;
+
     private final TypeSignature[] signatures;
 
     private static final TypeSignature[] EMPTY = new TypeSignature[0];
+
+    private static final Type[] EMPTY_TYPES = new Type[0];
 
     public static class Builder
     {
@@ -172,11 +238,23 @@ public class TypeSignature {
 
         TypeSignature build(TypeSignature parent)
         {
-            if (type == null && !signatures.isEmpty())
-                throw new IllegalArgumentException("Wildcard or variable type cannot have further signatures");
+            if (type == null)
+                if (!signatures.isEmpty())
+                    throw new IllegalArgumentException("Wildcard or variable type cannot have further signatures");
+                else if (dimension != 0)
+                    throw new IllegalArgumentException("Certain component type required in Generic Array");
+
+            TypeSignature[] uppers = new TypeSignature[upperBounds.size()];
+            TypeSignature[] lowers = new TypeSignature[lowerBounds.size()];
+
+            for (int i = 0; i < uppers.length; i++)
+                uppers[i] = upperBounds.get(i).build();
+
+            for (int i = 0; i < lowers.length; i++)
+                lowers[i] = lowerBounds.get(i).build();
 
             TypeSignature[] s = new TypeSignature[signatures.size()];
-            TypeSignature root = new TypeSignature(parent, type, name, s);
+            TypeSignature root = new TypeSignature(parent, type, name, dimension, uppers, lowers, s);
 
             for (int i = 0; i < s.length; i++)
                 s[i] = signatures.get(i).build(root);
@@ -205,6 +283,17 @@ public class TypeSignature {
         public Optional<String> name()
         {
             return Optional.ofNullable(name);
+        }
+
+        public Builder dimension(int dimension)
+        {
+            this.dimension = dimension;
+            return this;
+        }
+
+        public int dimension()
+        {
+            return dimension;
         }
 
         public Builder appendFurther()
@@ -239,6 +328,11 @@ public class TypeSignature {
             return this;
         }
 
+        public Builder appendArray(Class<?> componentType, int dimension)
+        {
+            return appendFurther().rawType(componentType).dimension(dimension);
+        }
+
         public List<Builder> further()
         {
             return signatures;
@@ -260,6 +354,12 @@ public class TypeSignature {
 
         private String name;
 
+        private int dimension = 0;
+
+        private final ArrayList<Builder> upperBounds = new ArrayList<>();
+
+        private final ArrayList<Builder> lowerBounds = new ArrayList<>();
+
         private final ArrayList<Builder> signatures = new ArrayList<>();
     }
 
@@ -269,6 +369,9 @@ public class TypeSignature {
 
         ParameterizedType t = (ParameterizedType) f.getGenericType();
         System.out.println(t.getRawType());
+
+        TypeVariable<?> wildcardType = (TypeVariable<?>) t.getActualTypeArguments()[0];
+        System.out.println(Arrays.asList(wildcardType.getBounds()));
 
         for (Type a : t.getActualTypeArguments())
             System.out.println(a + " (" + a.getClass().getCanonicalName() + ")");
