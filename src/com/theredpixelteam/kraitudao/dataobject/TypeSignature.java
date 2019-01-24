@@ -121,8 +121,25 @@ public final class TypeSignature {
 
     public static TypeSignature of(Type type)
     {
+        Builder builder = builder();
+
+        if (type instanceof WildcardType)
+        {
+            WildcardType wildcard = (WildcardType) type;
+
+            Type[] uppers = wildcard.getUpperBounds();
+            Type[] lowers = wildcard.getLowerBounds();
+
+            if (!(uppers.length == 1 && uppers[0].equals(Object.class)))
+                builder.upperBounds(of(uppers));
+
+            if (lowers.length != 0)
+                builder.lowerBounds(of(lowers));
+        }
+
         // TODO
-        return null;
+
+        return builder.build();
     }
 
     public static TypeSignature[] of(Type[] type)
@@ -176,19 +193,19 @@ public final class TypeSignature {
         return new TypeSignature(null, null, 0, EMPTY, EMPTY, null);
     }
 
-    public static TypeSignature upperBoundedWildcard(Type... upperBounds)
+    public static TypeSignature upperBoundedWildcard(TypeSignature... upperBounds)
     {
-        return boundedWildcard(upperBounds, EMPTY_TYPES);
+        return boundedWildcard(upperBounds, EMPTY);
     }
 
-    public static TypeSignature lowerBoundedWilcard(Type... lowerBounds)
+    public static TypeSignature lowerBoundedWilcard(TypeSignature... lowerBounds)
     {
-        return boundedWildcard(EMPTY_TYPES, lowerBounds);
+        return boundedWildcard(EMPTY, lowerBounds);
     }
 
-    public static TypeSignature boundedWildcard(Type[] upperBounds, Type[] lowerBounds)
+    public static TypeSignature boundedWildcard(TypeSignature[] upperBounds, TypeSignature[] lowerBounds)
     {
-        return new TypeSignature(null, null, 0, of(upperBounds), of(lowerBounds), null);
+        return new TypeSignature(null, null, 0, upperBounds, lowerBounds, null);
     }
 
     public static TypeSignature variable(String name)
@@ -196,9 +213,9 @@ public final class TypeSignature {
         return new TypeSignature(null, name, 0, EMPTY, EMPTY, null);
     }
 
-    public static TypeSignature boundedVariable(String name, Type... upperBounds)
+    public static TypeSignature boundedVariable(String name, TypeSignature... upperBounds)
     {
-        return new TypeSignature(null, name, 0, of(upperBounds), EMPTY, null);
+        return new TypeSignature(null, name, 0, upperBounds, EMPTY, null);
     }
 
     private final TypeSignature parent;
@@ -216,8 +233,6 @@ public final class TypeSignature {
     private final TypeSignature[] signatures;
 
     private static final TypeSignature[] EMPTY = new TypeSignature[0];
-
-    private static final Type[] EMPTY_TYPES = new Type[0];
 
     public static class Builder
     {
@@ -244,17 +259,11 @@ public final class TypeSignature {
                 else if (dimension != 0)
                     throw new IllegalArgumentException("Certain component type required in Generic Array");
 
-            TypeSignature[] uppers = new TypeSignature[upperBounds.size()];
-            TypeSignature[] lowers = new TypeSignature[lowerBounds.size()];
-
-            for (int i = 0; i < uppers.length; i++)
-                uppers[i] = upperBounds.get(i).build();
-
-            for (int i = 0; i < lowers.length; i++)
-                lowers[i] = lowerBounds.get(i).build();
-
             TypeSignature[] s = new TypeSignature[signatures.size()];
-            TypeSignature root = new TypeSignature(parent, type, name, dimension, uppers, lowers, s);
+            TypeSignature root = new TypeSignature(parent, type, name, dimension,
+                    upperBounds.toArray(new TypeSignature[0]),
+                    lowerBounds.toArray(new TypeSignature[0]),
+                    s);
 
             for (int i = 0; i < s.length; i++)
                 s[i] = signatures.get(i).build(root);
@@ -333,6 +342,28 @@ public final class TypeSignature {
             return appendFurther().rawType(componentType).dimension(dimension);
         }
 
+        public Builder upperBounds(TypeSignature... upperBounds)
+        {
+            this.upperBounds.addAll(Arrays.asList(upperBounds));
+            return this;
+        }
+
+        public List<TypeSignature> upperBounds()
+        {
+            return this.upperBounds;
+        }
+
+        public Builder lowerBounds(TypeSignature... lowerBounds)
+        {
+            this.lowerBounds.addAll(Arrays.asList(lowerBounds));
+            return this;
+        }
+
+        public List<TypeSignature> lowerBounds()
+        {
+            return this.lowerBounds;
+        }
+
         public List<Builder> further()
         {
             return signatures;
@@ -356,9 +387,9 @@ public final class TypeSignature {
 
         private int dimension = 0;
 
-        private final ArrayList<Builder> upperBounds = new ArrayList<>();
+        private final ArrayList<TypeSignature> upperBounds = new ArrayList<>();
 
-        private final ArrayList<Builder> lowerBounds = new ArrayList<>();
+        private final ArrayList<TypeSignature> lowerBounds = new ArrayList<>();
 
         private final ArrayList<Builder> signatures = new ArrayList<>();
     }
