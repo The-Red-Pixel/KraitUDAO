@@ -121,9 +121,23 @@ public final class TypeSignature {
 
     public static TypeSignature of(Type type)
     {
-        Builder builder = builder();
+        return inject(builder(), type).build();
+    }
 
-        if (type instanceof WildcardType)
+    private static Builder inject(Builder builder, Type type)
+    {
+        int dimension = 0;
+        while (type instanceof GenericArrayType)
+        {
+            dimension++;
+            type = ((GenericArrayType) type).getGenericComponentType();
+        }
+
+        builder.dimension(dimension);
+
+        if (type instanceof Class<?>)
+            builder.rawType((Class<?>) type);
+        else if (type instanceof WildcardType)
         {
             WildcardType wildcard = (WildcardType) type;
 
@@ -136,10 +150,28 @@ public final class TypeSignature {
             if (lowers.length != 0)
                 builder.lowerBounds(of(lowers));
         }
+        else if (type instanceof TypeVariable)
+        {
+            TypeVariable typevar = (TypeVariable) type;
 
-        // TODO
+            Type[] uppers = typevar.getBounds();
 
-        return builder.build();
+            if (!(uppers.length == 1 && uppers[0].equals(Object.class)))
+                builder.upperBounds(of(uppers));
+
+            builder.name(typevar.getName());
+        }
+        else if (type instanceof ParameterizedType)
+        {
+            ParameterizedType paramed = (ParameterizedType) type;
+
+            builder.rawType((Class<?>) paramed.getRawType());
+
+            for (Type param : paramed.getActualTypeArguments())
+                inject(builder.appendFurther(), param);
+        }
+
+        return builder;
     }
 
     public static TypeSignature[] of(Type[] type)
@@ -150,6 +182,48 @@ public final class TypeSignature {
             arr[i] = of(type[i]);
 
         return arr;
+    }
+
+    public static TypeSignature format(TypeSignature format, Class<?>... params)
+    {
+        if (!format.hasFurther())
+            return format;
+
+        Builder root = builder();
+
+        LinkedList<TypeSignature> typeSignatures = new LinkedList<>();
+        LinkedList<Builder> builders = new LinkedList<>();
+
+        typeSignatures.add(format);
+        builders.add(root);
+
+        while (!typeSignatures.isEmpty())
+        {
+            TypeSignature signature = typeSignatures.getLast();
+            typeSignatures.removeLast();
+
+            Builder builder = builders.getLast();
+            builders.removeLast();
+
+            if (signature.hasFurther())
+            {
+                
+            }
+            else if (signature.isWildcard())
+            {
+
+            }
+            else if (signature.isVariable())
+            {
+
+            }
+
+            builder
+                    .rawType(signature.getRawType().orElseThrow(IllegalArgumentException::new))
+                    .dimension(signature.getDimension());
+        }
+
+        return root.build();
     }
 
     @Override
@@ -274,7 +348,10 @@ public final class TypeSignature {
         public Builder rawType(Class<?> type)
         {
             this.type = type;
-            this.name = type.getCanonicalName();
+
+            if (type != null)
+                this.name = type.getCanonicalName();
+
             return this;
         }
 
