@@ -26,7 +26,7 @@ import com.theredpixelteam.redtea.util.Optional;
 import java.lang.reflect.*;
 import java.util.*;
 
-public final class TypeSignature {
+public final class TypeSignature{
     TypeSignature(Class<?> type,
                   String name,
                   int dimension,
@@ -52,6 +52,13 @@ public final class TypeSignature {
         this.upperBounds = upperBounds;
         this.lowerBounds = lowerBounds;
         this.signatures = signatures == null ? EMPTY : signatures;
+
+        if (type != null)
+            this.form = SignatureForm.EXPLICIT;
+        else if (name == null)
+            this.form = SignatureForm.WILDCARD;
+        else
+            this.form = SignatureForm.VARIABLE;
     }
 
     public Optional<TypeSignature> getParent()
@@ -91,17 +98,17 @@ public final class TypeSignature {
 
     public boolean isExplicit()
     {
-        return type != null;
+        return SignatureForm.EXPLICIT.equals(this.form);
     }
 
     public boolean isWildcard()
     {
-        return type == null && name == null;
+        return SignatureForm.WILDCARD.equals(this.form);
     }
 
     public boolean isVariable()
     {
-        return type == null && name != null;
+        return SignatureForm.VARIABLE.equals(this.form);
     }
 
     public boolean isArray()
@@ -117,6 +124,41 @@ public final class TypeSignature {
     public boolean hasFurther()
     {
         return signatures.length != 0;
+    }
+
+    public TypeSignature[] getUpperBounds()
+    {
+        return Arrays.copyOf(upperBounds, upperBounds.length);
+    }
+
+    public boolean hasUpperBounds()
+    {
+        return upperBounds.length != 0;
+    }
+
+    public TypeSignature[] getLowerBounds()
+    {
+        return Arrays.copyOf(lowerBounds, lowerBounds.length);
+    }
+
+    public boolean hasLowerBounds()
+    {
+        return lowerBounds.length != 0;
+    }
+
+    public boolean isCompatible(Class<?> type)
+    {
+        boolean flag = true;
+
+        switch (this.form)
+        {
+            case EXPLICIT:
+                return this.type.isAssignableFrom(type);
+
+                // TODO
+        }
+
+        return flag;
     }
 
     public static TypeSignature of(Type type)
@@ -186,7 +228,7 @@ public final class TypeSignature {
 
     public static TypeSignature format(TypeSignature format, Class<?>... params)
     {
-        if (!format.hasFurther())
+        if (params.length == 0)
             return format;
 
         Builder root = builder();
@@ -197,25 +239,46 @@ public final class TypeSignature {
         typeSignatures.add(format);
         builders.add(root);
 
+        int index = 0;
+
         while (!typeSignatures.isEmpty())
         {
-            TypeSignature signature = typeSignatures.getLast();
-            typeSignatures.removeLast();
-
-            Builder builder = builders.getLast();
-            builders.removeLast();
+            TypeSignature signature = typeSignatures.pollLast();
+            Builder builder = builders.pollLast();
 
             if (signature.hasFurther())
             {
-                
-            }
-            else if (signature.isWildcard())
-            {
+                TypeSignature[] further = signature.getFurther();
+                Builder[] furtherBuilders = new Builder[further.length];
 
-            }
-            else if (signature.isVariable())
-            {
+                for (int i = 0; i < further.length; i++)
+                    furtherBuilders[i] = builder.appendFurther();
 
+                for (int i = 0; i < further.length; i++)
+                {
+                    typeSignatures.add(further[further.length - i - 1]);
+                    builders.add(furtherBuilders[further.length - i -  1]);
+                }
+            }
+            else if (signature.isWildcard() || signature.isVariable())
+            {
+                if (index == params.length)
+                {
+                    builder
+                            .name(signature.getName().getSilently())
+                            .upperBounds(signature.getUpperBounds())
+                            .lowerBounds(signature.getLowerBounds())
+                            .dimension(signature.getDimension());
+
+                    continue;
+                }
+
+                if (signature.isCompatible(params[index]))
+                    builder.rawType(params[index++]);
+                else
+                    throw new IllegalArgumentException("Type: " + params[index - 1].getCanonicalName() + " is not compatible to signature: " + signature);
+
+                continue;
             }
 
             builder
@@ -305,6 +368,8 @@ public final class TypeSignature {
     private final TypeSignature[] lowerBounds;
 
     private final TypeSignature[] signatures;
+
+    private final SignatureForm form;
 
     private static final TypeSignature[] EMPTY = new TypeSignature[0];
 
@@ -474,16 +539,21 @@ public final class TypeSignature {
     public static void main(String[] args) throws Exception
     {
         Field f = TypeSignature.class.getDeclaredField("m");
+        TypeSignature ts = of(f.getGenericType());
 
-        ParameterizedType t = (ParameterizedType) f.getGenericType();
-        System.out.println(t.getRawType());
+        System.out.println(ts);
 
-        TypeVariable<?> wildcardType = (TypeVariable<?>) t.getActualTypeArguments()[0];
-        System.out.println(Arrays.asList(wildcardType.getBounds()));
+        ts = TypeSignature.format(ts, String.class, Void.class);
 
-        for (Type a : t.getActualTypeArguments())
-            System.out.println(a + " (" + a.getClass().getCanonicalName() + ")");
+        System.out.println(ts);
     }
 
-    private Map<?, Map<String, Integer>> m;
+    private Map<?, Map<?, Integer>> m;
+
+    public static enum SignatureForm
+    {
+        EXPLICIT,
+        WILDCARD,
+        VARIABLE
+    }
 }
