@@ -26,7 +26,7 @@ import com.theredpixelteam.redtea.util.Optional;
 import java.lang.reflect.*;
 import java.util.*;
 
-public final class TypeSignature{
+public final class TypeSignature {
     TypeSignature(Class<?> type,
                   String name,
                   int dimension,

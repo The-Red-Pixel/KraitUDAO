@@ -39,7 +39,7 @@ import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpretationExcepti
 import com.theredpixelteam.kraitudao.interpreter.DataObjectInterpreter;
 import com.theredpixelteam.kraitudao.interpreter.DataObjectMalformationException;
 import com.theredpixelteam.kraitudao.misc.Misc;
-import com.theredpixelteam.kraitudao.misc.Reflection;
+import com.theredpixelteam.kraitudao.reflect.Reflection;
 import com.theredpixelteam.kraitudao.reflect.Callable;
 import com.theredpixelteam.kraitudao.reflect.MethodEntry;
 import com.theredpixelteam.redtea.function.Consumer;
