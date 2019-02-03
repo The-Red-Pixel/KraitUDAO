@@ -168,14 +168,7 @@ public final class TypeSignature {
 
     private static Builder inject(Builder builder, Type type)
     {
-        int dimension = 0;
-        while (type instanceof GenericArrayType)
-        {
-            dimension++;
-            type = ((GenericArrayType) type).getGenericComponentType();
-        }
-
-        builder.dimension(dimension);
+        builder.dimension(getDimension(type));
 
         if (type instanceof Class<?>)
             builder.rawType((Class<?>) type);
@@ -353,6 +346,69 @@ public final class TypeSignature {
     public static TypeSignature boundedVariable(String name, TypeSignature... upperBounds)
     {
         return new TypeSignature(null, name, 0, upperBounds, EMPTY, null);
+    }
+
+    public static int getDimension(Class<?> type)
+    {
+        int dimension = 0;
+
+        while ((type = type.getComponentType()) != null)
+            dimension++;
+
+        return dimension;
+    }
+
+    public static int getDimension(Type type)
+    {
+        int dimension = 0;
+
+        while (type instanceof GenericArrayType)
+        {
+            type = ((GenericArrayType) type).getGenericComponentType();
+            dimension++;
+        }
+
+        return dimension;
+    }
+
+    public static int compareDimension(Class<?> major, Class<?> minor)
+    {
+        return getDimension(major) - getDimension(minor);
+    }
+
+    public static int compareDimension(Type major, Type minor)
+    {
+        return getDimension(major) - getDimension(minor);
+    }
+
+    public static int compareDimension(Class<?> major, Type minor)
+    {
+        return getDimension(major) - getDimension(minor);
+    }
+
+    public static int compareDimension(Type major, Class<?> minor)
+    {
+        return getDimension(major) - getDimension(minor);
+    }
+
+    public static Class<?> getRootComponentType(Class<?> type)
+    {
+        Class<?> last = type;
+
+        while ((type = type.getComponentType()) != null)
+            last = type;
+
+        return last;
+    }
+
+    public static Type getRootComponentType(Type type)
+    {
+        Type last = type;
+
+        while (type instanceof GenericArrayType)
+            type = ((GenericArrayType) type).getGenericComponentType();
+
+        return type;
     }
 
     private final TypeSignature parent;
